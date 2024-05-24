@@ -80,7 +80,7 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
     let morphtype =
             crate::repr_tree::MorphismType {
                 src_type: Context::parse(&ctx, "<Digit Radix>~Char"),
-                dst_type: Context::parse(&ctx, "<Digit Radix>~ℤ_256~machine::UInt8")
+                dst_type: Context::parse(&ctx, "<Digit Radix>~ℤ_2^64~machine.UInt64")
             };
 
     ctx.write().unwrap()
@@ -124,7 +124,7 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
 
     let morphtype =
             crate::repr_tree::MorphismType {
-                src_type: Context::parse(&ctx, "<Digit Radix>~ℤ_256~machine::UInt8"),
+                src_type: Context::parse(&ctx, "<Digit Radix>~ℤ_2^64~machine.UInt64"),
                 dst_type: Context::parse(&ctx, "<Digit Radix>~Char")
             };
 
@@ -144,10 +144,10 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
                     /* insert projected view into ReprTree
                      */
                     let char_view = 
-                        rt.descend(Context::parse(&ctx, "ℤ_256~machine::UInt8"))
+                        rt.descend(Context::parse(&ctx, "ℤ_2^64~machine::UInt64"))
                             .unwrap()
-                            .view_u8()
-                            .map(move |digit| char::from_digit(digit as u32, radix).unwrap_or('?'));
+                            .view_usize()
+                            .map(move |digit| char::from_digit((digit%radix as usize) as u32, radix).unwrap_or('?'));
 
                     rt.write().unwrap().attach_leaf_to::<dyn SingletonView<Item = char>>(
                         Context::parse(&ctx, "Char").get_lnf_vec().into_iter(),

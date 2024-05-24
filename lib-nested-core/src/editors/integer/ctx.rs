@@ -5,8 +5,7 @@ use {
     },
     laddertypes::{TypeTerm},
     crate::{
-        repr_tree::{Context},
-        repr_tree::{MorphismType},
+        repr_tree::{ReprTree, ReprLeaf, Context, MorphismType},
         editors::{
             list::*,
             integer::*
@@ -16,97 +15,142 @@ use {
 };
 
 pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
-    /*
-    ctx.add_list_typename("PosInt".into());
-    let pattern = MorphismTypePattern {
-        src_tyid: ctx.get_typeid("List"),
-        dst_tyid: ctx.get_typeid("PosInt").unwrap()
+    // TODO: proper scoping
+    // ctx.write().unwrap().add_varname("Radix");
+    ctx.write().unwrap().add_varname("SrcRadix");
+    ctx.write().unwrap().add_varname("DstRadix");
+
+    let morphism_type = MorphismType {
+        src_type: Context::parse(&ctx, "ℕ ~ <PosInt Radix BigEndian> ~ <Seq <Digit SrcRadix>~ℤ_2^64~machine.UInt64>"),
+        dst_type: Context::parse(&ctx, "ℕ ~ <PosInt Radix LittleEndian> ~ <Seq <Digit DstRadix>~ℤ_2^64~machine.UInt64>")
     };
-    ctx.add_morphism(pattern,
-        Arc::new(
-            |mut node, dst_type| {
-                // todo: check src_type parameter to be ( Digit radix )
 
-                match dst_type {
-                    TypeTerm::App(args) => {
-                        if args.len() > 1 {
-                            match args[1] {
-                                TypeTerm::Num(_radix) => {
-                                    /* FIXME
-                                    PTYListController::for_node(
-                                        &mut node,
-                                        Some(','),
-                                        None,
-                                    );
+    ctx.write().unwrap().morphisms.add_morphism(
+        morphism_type,
+        {
+            let ctx = ctx.clone();
+            move |src_rt, σ| {
+                let src_digits = ReprTree::descend(
+                    &src_rt,
+                    Context::parse(&ctx, "
+                            <PosInt Radix BigEndian>
+                            ~<Seq <Digit Radix>~ℤ_2^64~machine.UInt64 >
+                        ")
+                    .apply_substitution(&|k|σ.get(k).cloned()).clone()
+                ).expect("cant descend")
+                    .read().unwrap()
+                    .view_seq::< usize >();
 
-                                    PTYListStyle::for_node(
-                                        &mut node,
-                                        ("0d", "", "")
-                                    );
-*/
-                                    Some(node)
-                                },
-                                _ => None
-                            }
-                        } else {
-                            None
-                        }
-                    }
-                    _ => None
-                }
+                src_rt.write().unwrap().insert_leaf(
+                        vec![
+                            Context::parse(&ctx, "<PosInt Radix LittleEndian>")
+                                .apply_substitution(&|k|σ.get(k).cloned()).clone(),
+                            Context::parse(&ctx, "<Seq <Digit Radix>>")
+                                .apply_substitution(&|k|σ.get(k).cloned()).clone(),
+                            Context::parse(&ctx, "<Seq ℤ_2^64>"),
+                            Context::parse(&ctx, "<Seq machine.UInt64>")
+                        ].into_iter(),
+
+                        ReprLeaf::from_view( src_digits.reverse() )
+                    );
             }
-        )
+        }
     );
 
-    ctx.add_node_ctor(
-        "PosInt", Arc::new(
-            |ctx0: Arc<RwLock<Context>>, dst_typ: TypeTerm, depth: OuterViewPort<dyn SingletonView<Item = usize>>| {
-                match dst_typ.clone() {
-                    TypeTerm::App(args) => {
-                        if args.len() > 1 {
-                            match args[1] {
-                                TypeTerm::Num(radix) => {
-                                    let ctx = ctx0.read().unwrap();
-                                    let mut node = Context::make_node(
-                                        &ctx0,
-                                        TypeTerm::App(vec![
-                                            TypeTerm::TypeID(ctx.get_typeid("List").unwrap()),
-                                            TypeTerm::TypeID(
-                                                ctx.get_typeid("Digit").unwrap()
-                                            )
-                                                .num_arg(radix)
-                                                .clone()
-                                                .into()
-                                        ]),
-                                        depth.map(|d| d+1)
-                                    ).unwrap();
 
-                                    node = node.morph(dst_typ);
 
-                                    Some(node)
-                                }
-                                _ => None
-                            }
-                        } else {
-                            None
-                        }
-                    }
-                    _ => None
-                }
+
+    let morphism_type = MorphismType {
+        src_type: Context::parse(&ctx, "ℕ ~ <PosInt Radix LittleEndian> ~ <Seq <Digit SrcRadix>~ℤ_2^64~machine.UInt64>"),
+        dst_type: Context::parse(&ctx, "ℕ ~ <PosInt Radix BigEndian> ~ <Seq <Digit DstRadix>~ℤ_2^64~machine.UInt64>")
+    };
+
+    ctx.write().unwrap().morphisms.add_morphism(
+        morphism_type,
+        {
+            let ctx = ctx.clone();
+            move |src_rt, σ| {
+                let src_digits = ReprTree::descend(
+                    &src_rt,
+                    Context::parse(&ctx, "
+                            <PosInt Radix LittleEndian>
+                            ~<Seq <Digit Radix>~ℤ_2^64~machine.UInt64 >
+                        ")
+                    .apply_substitution(&|k|σ.get(k).cloned()).clone()
+                ).expect("cant descend")
+                    .read().unwrap()
+                    .view_seq::< usize >();
+
+                src_rt.write().unwrap().insert_leaf(
+                        vec![
+                            Context::parse(&ctx, "<PosInt Radix BigEndian>")
+                                .apply_substitution(&|k|σ.get(k).cloned()).clone(),
+                            Context::parse(&ctx, "<Seq <Digit Radix>>")
+                                .apply_substitution(&|k|σ.get(k).cloned()).clone(),
+                            Context::parse(&ctx, "<Seq ℤ_2^64>"),
+                            Context::parse(&ctx, "<Seq machine.UInt64>")
+                        ].into_iter(),
+
+                        ReprLeaf::from_view( src_digits.reverse() )
+                    );
             }
-        )
+        }
     );
-    */
-    /* 
-    ctx.add_typename("Date".into());
-    ctx.add_typename("ISO-8601".into());
-    ctx.add_typename("TimeSince".into());
-    ctx.add_typename("UnixEpoch".into());
-    ctx.add_typename("AnnoDomini".into());
-    ctx.add_typename("Epoch".into());
-    ctx.add_typename("Duration".into());
-    ctx.add_typename("Seconds".into());
-    ctx.add_typename("ℕ".into());
-    */
+
+
+
+
+    let morphism_type = MorphismType {
+        src_type: Context::parse(&ctx, "ℕ ~ <PosInt SrcRadix LittleEndian> ~ <Seq <Digit SrcRadix>~ℤ_2^64~machine.UInt64>"),
+        dst_type: Context::parse(&ctx, "ℕ ~ <PosInt DstRadix LittleEndian> ~ <Seq <Digit DstRadix>~ℤ_2^64~machine.UInt64>")
+    };
+
+    ctx.write().unwrap().morphisms.add_morphism(
+        morphism_type,
+        {
+            let ctx = ctx.clone();
+            move |src_rt, σ| {
+                let src_radix = match σ.get(&laddertypes::TypeID::Var(
+                    ctx.read().unwrap().get_var_typeid("SrcRadix").unwrap()
+                )) {
+                    Some(laddertypes::TypeTerm::Num(n)) => *n as usize,
+                    _ => 0
+                };
+
+                let dst_radix = match σ.get(&laddertypes::TypeID::Var(
+                    ctx.read().unwrap().get_var_typeid("DstRadix").unwrap()
+                )) {
+                    Some(laddertypes::TypeTerm::Num(n)) => *n as usize,
+                    _ => 0
+                };
+
+                let src_digits_rt = ReprTree::descend(
+                    src_rt,
+                    Context::parse(&ctx, "
+                           <PosInt SrcRadix LittleEndian>
+                         ~ <Seq <Digit SrcRadix> ~ ℤ_2^64 ~ machine.UInt64 >"
+                    ).apply_substitution(&|k|σ.get(k).cloned()).clone()
+                ).expect("cant descend repr tree");
+
+                let dst_digits_port =
+                    src_digits_rt.read().unwrap()
+                        .view_seq::<usize>()
+                        .to_positional_uint( src_radix )
+                        .transform_radix( dst_radix )
+                ;
+
+                src_rt.write().unwrap()
+                    .insert_leaf(
+                        vec![
+                            Context::parse(&ctx, "<PosInt DstRadix LittleEndian>").apply_substitution(&|k|σ.get(k).cloned()).clone(),
+                            Context::parse(&ctx, "<Seq <Digit DstRadix>>").apply_substitution(&|k|σ.get(k).cloned()).clone(),
+                            Context::parse(&ctx, "<Seq ℤ_2^64>"),
+                            Context::parse(&ctx, "<Seq machine.UInt64>"),
+                        ].into_iter(),
+                        ReprLeaf::from_view(dst_digits_port)
+                    );
+            }
+        }
+    );
 }
 

@@ -1,69 +1,127 @@
 use {
     r3vi::{
         view::{
+            View, ViewPort,
             InnerViewPort, Observer, OuterViewPort,
+            ObserverBroadcast,
             sequence::*,
+            list::*
         },
         buffer::{vec::*}
+    },
+    crate::{
+        editors::integer::{
+            PositionalUInt
+        },
+        repr_tree::{ReprTree, ReprLeaf}
     },
     std::sync::{Arc, RwLock},
 };
 
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+
+pub trait PosIntProjections {
+    fn transform_radix(&self, dst_radix: usize) -> OuterViewPort<dyn SequenceView<Item = usize>>;
+//    fn to_digits(&self) -> OuterViewPort<dyn SequenceView<Item = usize>>;
+}
+
+impl PosIntProjections for OuterViewPort<dyn PositionalUInt> {
+    fn transform_radix(&self, dst_radix: usize) -> OuterViewPort<dyn SequenceView<Item = usize>> {
+        let port = ViewPort::<dyn SequenceView<Item = usize>>::new();
+        port.add_update_hook(Arc::new(self.0.clone()));
+
+//        let mut vec_port = ViewPort::new();
+        let proj = Arc::new(RwLock::new(RadixProjection {
+            src: None,
+            dst_radix,
+            dst_digits: VecBuffer::new(),
+            cast: port.inner().get_broadcast()
+        }));
+
+        self.add_observer(proj.clone());
+        port.set_view(Some(proj as Arc<dyn SequenceView<Item = usize>>));
+        port.into_outer()
+    }
+/*
+    fn to_digits(&self) -> OuterViewPort<dyn SequenceView<Item = usize>> {
+        let port = ViewPort::new();
+        port.add_update_hook(Arc::new(self.0.clone()));
+        let proj = Arc::new(RwLock::new(PosUIntToDigits {
+            src: None,
+            cast: port.inner().get_broadcast()
+        }));
+        self.add_observer(proj.clone());
+        port.inner().set_view(Some(proj));
+        port.into_outer()
+    }
+    */
+}
+
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+
 pub struct RadixProjection {
-    src_radix: usize,
+    src: Option<Arc<dyn PositionalUInt>>,
     dst_radix: usize,
-    src_digits: Option<Arc<dyn SequenceView<Item = usize>>>,
-    dst_digits: RwLock<VecBuffer<usize>>,
+    dst_digits: VecBuffer<usize>,
+    cast: Arc<RwLock<ObserverBroadcast<dyn SequenceView<Item = usize>>>>
+}
+
+impl View for RadixProjection {
+    type Msg = usize;
+}
+
+impl SequenceView for RadixProjection {
+    type Item = usize;
+
+    fn get(&self, idx: &usize) -> Option<usize> {
+        if *idx < self.dst_digits.len() {
+            Some(self.dst_digits.get(*idx))
+        } else {
+            None
+        }
+    }
+
+    fn len(&self) -> Option<usize> {
+        Some(self.dst_digits.len())
+    }
+}
+
+impl PositionalUInt for RadixProjection {
+    fn get_radix(&self) -> usize {
+        self.dst_radix
+    }
+}
+
+impl Observer< dyn PositionalUInt > for RadixProjection {
+    fn reset(&mut self, view: Option<Arc<dyn PositionalUInt>>) {
+        self.src = view;
+        self.update();
+    }
+
+    fn notify(&mut self, idx: &usize) {
+        self.update();
+        // self.update_digit(idx)
+    }
 }
 
 impl RadixProjection {
-    pub fn new(
-        // static parameters
-        //---
-        src_radix: usize,
-        dst_radix: usize,
-        //---
+    /// recalculate everything
+    fn update(&mut self) {
+//       let mut dst = self.dst_digits;
+        let old_len = self.dst_digits.len();
+        self.dst_digits.clear();
 
-        // dynamic parameters
-        //---
-        // input
-        src_digits: OuterViewPort<dyn SequenceView<Item = usize>>,
-        // output
-        dst_digits: InnerViewPort<RwLock<Vec<usize>>>,
-        //---
-    ) -> Arc<RwLock<Self>> {
-        dst_digits.0.add_update_hook(Arc::new(src_digits.0.clone()));
-        let proj = Arc::new(RwLock::new(RadixProjection {
-            src_radix,
-            dst_radix,
-            src_digits: None,
-            dst_digits: RwLock::new(VecBuffer::with_port(dst_digits)),
-        }));
-        src_digits.add_observer(proj.clone());
-        proj
-    }
-
-    fn machine_int(&self) -> usize {
-        let mut val = 0;
-        let mut r = 1;
-        for i in 0..self.src_digits.len().unwrap_or(0) {
-            val += r * self.src_digits.get(&i).unwrap();
-            r *= self.src_radix;
+        if let Some(src) = self.src.as_ref() {
+            let mut val = src.get_value();
+            while val > 0 {
+                self.dst_digits.push(val % self.dst_radix);
+                val /= self.dst_radix;
+            }
         }
 
-        val
-    }
-
-    // recalculate everything
-    fn update(&self) {
-        let mut dst = self.dst_digits.write().unwrap();
-        dst.clear();
-
-        let mut val = self.machine_int();
-
-        while val > 0 {
-            dst.push(val % self.dst_radix);
-            val /= self.dst_radix;
+        let new_len = self.dst_digits.len();
+        for i in 0 .. usize::max(old_len, new_len) {
+             self.cast.write().unwrap().notify(&i);
         }
     }
 
@@ -84,18 +142,3 @@ impl RadixProjection {
     }
 }
 
-impl Observer<dyn SequenceView<Item = usize>> for RadixProjection {
-    fn reset(&mut self, view: Option<Arc<dyn SequenceView<Item = usize>>>) {
-        self.src_digits = view;
-    }
-
-    fn notify(&mut self, _idx: &usize) {
-        // todo:
-        // src digit i changed.
-        // which dst-digits does it affect?
-        // update dst-digit j:
-
-        // ...but for now the easy way
-        self.update();
-    }
-}

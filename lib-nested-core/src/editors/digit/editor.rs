@@ -73,6 +73,11 @@ impl DigitEditor {
     pub fn get_type(&self) -> TypeTerm {
         TypeTerm::TypeID(self.ctx.read().unwrap().get_typeid("Digit").unwrap())
     }
+
+    pub fn get_char(&self) -> char {
+        self.data.get()
+    }
+
 /*
     pub fn get_data(&self) -> Arc<RwLock<ReprTree>> {
         ReprTree::ascend(

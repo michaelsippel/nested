@@ -36,6 +36,7 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
                         if let Some(buf) = rt.singleton_buffer::<char>() {
                             // buffer already exists
                         } else {
+                            // create char buffer
                             rt.insert_leaf(
                                 vec![].into_iter(),
                                 ReprLeaf::from_singleton_buffer(

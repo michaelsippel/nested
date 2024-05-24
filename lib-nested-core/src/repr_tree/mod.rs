@@ -396,6 +396,10 @@ impl ReprTree {
     pub fn view_u64(&self) -> OuterViewPort<dyn SingletonView<Item = u64>> {
         self.get_port::<dyn SingletonView<Item = u64>>().expect("no u64-view available")
     }
+
+    pub fn view_usize(&self) -> OuterViewPort<dyn SingletonView<Item = usize>> {
+        self.get_port::<dyn SingletonView<Item = usize>>().expect("no usize-view available")
+    }
 }
 
 
@@ -412,6 +416,7 @@ pub trait ReprTreeExt {
     fn view_char(&self) -> OuterViewPort<dyn SingletonView<Item = char>>;
     fn view_u8(&self) -> OuterViewPort<dyn SingletonView<Item = u8>>;
     fn view_u64(&self) -> OuterViewPort<dyn SingletonView<Item = u64>>;
+    fn view_usize(&self) -> OuterViewPort<dyn SingletonView<Item = usize>>;
 
     fn singleton_buffer<T: Clone + Send + Sync + 'static>(&self) -> SingletonBuffer<T>;
     fn vec_buffer<T: Clone + Send + Sync + 'static>(&self) -> VecBuffer<T>;
@@ -444,6 +449,10 @@ impl ReprTreeExt for Arc<RwLock<ReprTree>> {
 
     fn view_u64(&self) -> OuterViewPort<dyn SingletonView<Item = u64>> {
         self.read().unwrap().view_u64()
+    }
+
+    fn view_usize(&self) -> OuterViewPort<dyn SingletonView<Item = usize>> {
+        self.read().unwrap().view_usize()
     }
 
     fn singleton_buffer<T: Clone + Send + Sync + 'static>(&self) -> SingletonBuffer<T> {

@@ -92,6 +92,41 @@ pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
         }
     );
 
+    let mt = crate::repr_tree::MorphismType {
+        src_type: Context::parse(&ctx, "<List <Digit 16>>~EditTree"),
+        dst_type: Context::parse(&ctx, "<List <Digit 16>~Char>")
+    };
+    ctx.write().unwrap().morphisms.add_morphism(
+        mt,
+        {
+            let ctx = ctx.clone();
+            move |src_rt, σ| {
+                let edittree =
+                    src_rt
+                        .descend(Context::parse(&ctx, "EditTree")).unwrap()
+                        .singleton_buffer::<EditTree>();
+
+                let list_edit = edittree.get().get_edit::< ListEditor >().unwrap();
+                let edittree_items = list_edit.read().unwrap().data.get_port().to_list();
+                src_rt.write().unwrap().insert_leaf(
+                    vec![ Context::parse(&ctx, "<List Char>") ].into_iter(),
+                    ReprLeaf::from_view(
+                        edittree_items
+                            .map(
+                                |edittree_char|
+                                    edittree_char
+                                    .read().unwrap()
+                                    .get_edit::<crate::editors::digit::editor::DigitEditor>().unwrap()
+                                    .read().unwrap()
+                                    .get_char()
+                            )
+                    )
+                );
+            }
+        }
+    );
+
+
 
     let mt = crate::repr_tree::MorphismType {
         src_type: Context::parse(&ctx, "<List Char>"),
