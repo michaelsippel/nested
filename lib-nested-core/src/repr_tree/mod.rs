@@ -411,6 +411,7 @@ pub trait ReprTreeExt {
 
     fn insert_leaf(&mut self, type_ladder: impl Into<TypeTerm>, leaf: ReprLeaf);
     fn insert_branch(&mut self, repr: Arc<RwLock<ReprTree>>);
+    fn create_branch(&mut self, rung: impl Into<TypeTerm>);
     fn descend(&self, target_type: impl Into<TypeTerm>) -> Option<Arc<RwLock<ReprTree>>>;
 
     fn view_char(&self) -> OuterViewPort<dyn SingletonView<Item = char>>;
@@ -433,6 +434,25 @@ impl ReprTreeExt for Arc<RwLock<ReprTree>> {
 
     fn insert_branch(&mut self, repr: Arc<RwLock<ReprTree>>) {
         self.write().unwrap().insert_branch(repr)
+    }
+
+    fn create_branch(&mut self, rung: impl Into<TypeTerm>) {
+        let lnf = rung.into().get_lnf_vec();
+        eprintln!("lnf ={:?}",lnf);
+
+        let mut child = None;
+        for rung in lnf.iter().rev() {
+            eprintln!("create {:?}",rung);
+            let mut parent = ReprTree::new_arc( rung.clone() );
+            if let Some(c) = child.take() {
+                parent.insert_branch( c );
+            }
+            child = Some(parent);
+        }
+
+        if let Some(child) = child.take() {
+            self.insert_branch(child);
+        }
     }
 
     fn descend(&self, target_type: impl Into<TypeTerm>) -> Option<Arc<RwLock<ReprTree>>> {

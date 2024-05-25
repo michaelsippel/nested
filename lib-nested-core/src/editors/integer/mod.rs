@@ -29,9 +29,9 @@ use {
     std::sync::{Arc, RwLock}
 };
 
-pub trait PositionalUInt : SequenceView<Item = usize> {
-    fn get_radix(&self) -> usize;
-    fn get_value(&self) -> usize {
+pub trait PositionalUInt : SequenceView<Item = u64> {
+    fn get_radix(&self) -> u64;
+    fn get_value(&self) -> u64 {
         let mut val = 0;
         let mut r = 1;
         for i in 0..self.len().unwrap_or(0) {
@@ -44,14 +44,14 @@ pub trait PositionalUInt : SequenceView<Item = usize> {
 }
 
 impl<V: PositionalUInt> PositionalUInt for RwLock<V> {
-    fn get_radix(&self) -> usize {
+    fn get_radix(&self) -> u64 {
         self.read().unwrap().get_radix()
     }
 }
 
 struct PosUIntFromDigits {
-    radix: usize,
-    src_digits: Option<Arc<dyn SequenceView<Item = usize>>>,
+    radix: u64,
+    src_digits: Option<Arc<dyn SequenceView<Item = u64>>>,
     cast: Arc<RwLock<ObserverBroadcast<dyn PositionalUInt>>>
 }
 
@@ -60,9 +60,9 @@ impl View for PosUIntFromDigits {
 }
 
 impl SequenceView for PosUIntFromDigits {
-    type Item = usize;
+    type Item = u64;
 
-    fn get(&self, idx: &usize) -> Option<usize> {
+    fn get(&self, idx: &usize) -> Option<u64> {
         self.src_digits.get(idx)
     }
 
@@ -72,13 +72,13 @@ impl SequenceView for PosUIntFromDigits {
 }
 
 impl PositionalUInt for PosUIntFromDigits {
-    fn get_radix(&self) -> usize {
+    fn get_radix(&self) -> u64 {
         self.radix
     }
 }
 
-impl Observer<dyn SequenceView<Item = usize>> for PosUIntFromDigits {
-    fn reset(&mut self, new_src: Option<Arc<dyn SequenceView<Item = usize>>>) {
+impl Observer<dyn SequenceView<Item = u64>> for PosUIntFromDigits {
+    fn reset(&mut self, new_src: Option<Arc<dyn SequenceView<Item = u64>>>) {
         self.src_digits = new_src;
 //        self.cast.write().unwrap().notify(0);
     }
@@ -91,11 +91,11 @@ impl Observer<dyn SequenceView<Item = usize>> for PosUIntFromDigits {
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub trait DigitSeqProjection {
-    fn to_positional_uint(&self, radix: usize) -> OuterViewPort<dyn PositionalUInt>;
+    fn to_positional_uint(&self, radix: u64) -> OuterViewPort<dyn PositionalUInt>;
 }
 
-impl DigitSeqProjection for OuterViewPort<dyn SequenceView<Item = usize>> {
-    fn to_positional_uint(&self, radix: usize) -> OuterViewPort<dyn PositionalUInt> {
+impl DigitSeqProjection for OuterViewPort<dyn SequenceView<Item = u64>> {
+    fn to_positional_uint(&self, radix: u64) -> OuterViewPort<dyn PositionalUInt> {
         let port = ViewPort::new();
         port.add_update_hook(Arc::new(self.0.clone()));
 
@@ -115,7 +115,7 @@ impl DigitSeqProjection for OuterViewPort<dyn SequenceView<Item = usize>> {
 
 struct PosUIntToDigits {
     src: Option<Arc<dyn PositionalUInt>>,
-    cast: Arc<RwLock<ObserverBroadcast<dyn SequenceView<Item = usize>>>>
+    cast: Arc<RwLock<ObserverBroadcast<dyn SequenceView<Item = u64>>>>
 }
 
 impl View for PosUIntToDigits {
@@ -123,9 +123,9 @@ impl View for PosUIntToDigits {
 }
 
 impl SequenceView for PosUIntToDigits {
-    type Item = usize;
+    type Item = u64;
 
-    fn get(&self, idx: &usize) -> Option<usize> {
+    fn get(&self, idx: &usize) -> Option<u64> {
         self.src.get(idx)
     }
 

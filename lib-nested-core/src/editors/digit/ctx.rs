@@ -98,18 +98,18 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
                             _ => 0
                         };
 
-                    if radix <= 256 {
+                    if radix <= 16 {
 
                         if let Some(src_rt) = rt.descend(Context::parse(&ctx, "Char")) {
                             /* insert projected view into ReprTree
                              */
-                            let u8_view = 
+                            let u64_view = 
                                     src_rt.view_char()
-                                        .map(move |c| c.to_digit(radix).unwrap_or(0) as u8);
+                                        .map(move |c| c.to_digit(radix).unwrap_or(0) as u64);
 
-                            rt.write().unwrap().attach_leaf_to::<dyn SingletonView<Item = u8>>(
-                                Context::parse(&ctx, "ℤ_256~machine::UInt8").get_lnf_vec().into_iter(),
-                                u8_view
+                            rt.write().unwrap().attach_leaf_to::<dyn SingletonView<Item = u64>>(
+                                Context::parse(&ctx, "ℤ_2^64~machine.UInt64").get_lnf_vec().into_iter(),
+                                u64_view
                             );
                         } else {
                             eprintln!("could not find required source representation: <Digit {}>~Char", radix);
@@ -134,20 +134,20 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
             move |rt: &mut Arc<RwLock<ReprTree>>, σ: &std::collections::HashMap<laddertypes::TypeID, TypeTerm>| {
                 /* infer radix from type
                  */
-                let radix =
+                let radix  =
                     match σ.get( &laddertypes::TypeID::Var(ctx.read().unwrap().get_var_typeid("Radix").unwrap()) ) {
                        Some(TypeTerm::Num(n)) => (*n) as u32,
                         _ => 0
                     };
 
-                if radix <= 256 {
+                if radix <= 16 {
                     /* insert projected view into ReprTree
                      */
                     let char_view = 
-                        rt.descend(Context::parse(&ctx, "ℤ_2^64~machine::UInt64"))
+                        rt.descend(Context::parse(&ctx, "ℤ_2^64~machine.UInt64"))
                             .unwrap()
-                            .view_usize()
-                            .map(move |digit| char::from_digit((digit%radix as usize) as u32, radix).unwrap_or('?'));
+                            .view_u64()
+                            .map(move |digit| char::from_digit((digit%radix as u64) as u32, radix).unwrap_or('?'));
 
                     rt.write().unwrap().attach_leaf_to::<dyn SingletonView<Item = char>>(
                         Context::parse(&ctx, "Char").get_lnf_vec().into_iter(),

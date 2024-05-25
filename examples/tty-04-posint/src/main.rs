@@ -43,48 +43,54 @@ async fn main() {
     nested::editors::list::init_ctx( ctx.clone() );
     nested_tty::setup_edittree_hook(&ctx);
 
-    /* Create a Representation-Tree of type <List <Digit 16>>
-     */
-    let mut rt_digitlist = ReprTree::new_arc( Context::parse(&ctx, "<List <Digit 16>>") );
-    let mut rt_digitseq = ReprTree::new_arc( Context::parse(&ctx, "<Seq <Digit 16>>") );
-    rt_digitseq.insert_branch( rt_digitlist );
-    let mut rt_posint = ReprTree::new_arc(Context::parse(&ctx, "<PosInt 16 BigEndian>"));
-    rt_posint.insert_branch( rt_digitseq );
-    let mut rt_int = ReprTree::new_arc( Context::parse(&ctx, "ℕ") );
-    rt_int.insert_branch( rt_posint );
 
-    /* Setup an Editor for this ReprTree
-     * (this will add the representation <List <Digit 16>>~EditTree to the ReprTree)
+    /* Create a Representation-Tree of type `ℕ`
+     */
+    let mut rt_int = ReprTree::new_arc( Context::parse(&ctx, "ℕ") );
+
+    /* Add a specific Representation-Path (big-endian hexadecimal)
+     */
+    rt_int.create_branch(
+        Context::parse(&ctx, "<PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16>>")
+    );
+
+    /* Setup an Editor for the big-endian hexadecimal representation
+     * (this will add the representation `<List <Digit 16>>~EditTree` to the ReprTree)
      */
     let rt_edittree_list = ctx.read().unwrap()
         .setup_edittree(
-            ReprTree::descend(
-                &rt_int,
-                Context::parse(&ctx, "<PosInt 16 BigEndian>~<Seq~List <Digit 16>>")
-            ).expect("cant descend reprtree"),
+            rt_int.descend(Context::parse(&ctx, "
+                      <PosInt 16 BigEndian>
+                    ~ <Seq <Digit 16>>
+                    ~ <List <Digit 16>>
+            ")).expect("cant descend reprtree"),
             SingletonBuffer::new(0).get_port()
         );
 
+    /* Setup a morphism to extract Char values from the list-editor
+     */
     ctx.read().unwrap().morphisms.apply_morphism(
-        ReprTree::descend(&rt_int,
-            Context::parse(&ctx, "
-                    <PosInt 16 BigEndian>
-                    ~<Seq <Digit 16>>
-                    ~<List <Digit 16>>
-                ")
-        ).expect("cant descend repr tree"),
+        rt_int.descend(Context::parse(&ctx, "
+                      <PosInt 16 BigEndian>
+                    ~ <Seq <Digit 16>>
+                    ~ <List <Digit 16>>
+        ")).expect("cant descend reprtree"),
         &Context::parse(&ctx, "<List <Digit 16>>~EditTree"),
         &Context::parse(&ctx, "<List <Digit 16>~Char>")
     );
 
     /*
      * map seq of chars to seq of u64 digits
+     * and add this projection to the ReprTree
      */
-    let mut chars_view =
-        ReprTree::descend(
-            &rt_int,
-            Context::parse(&ctx, "<PosInt 16 BigEndian>~<Seq <Digit 16>>~<List <Digit 16>~Char>")
-        ).expect("cant descend")
+
+    //
+    //VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
+    let mut chars_view = rt_int.descend(Context::parse(&ctx, "
+               < PosInt 16 BigEndian >
+            ~  < Seq <Digit 16> >
+            ~  < List <Digit 16>~Char >
+        ")).expect("cant descend")
         .read().unwrap()
         .get_port::<dyn ListView<char>>()
         .unwrap();
@@ -94,75 +100,85 @@ async fn main() {
         .filter_map(
             |digit_char|
 
-            /* TODO: call morphism
+            /* TODO: call morphism for each item
              */
             match digit_char.to_digit(16) {
-                Some(d) => Some(d as usize),
+                Some(d) => Some(d as u64),
                 None    => None
             }
         );
 
-    rt_int.write().unwrap().insert_leaf(
-        vec![
-            Context::parse(&ctx, "<PosInt 16 BigEndian>"),
-            Context::parse(&ctx, "<Seq <Digit 16>>"),
-            Context::parse(&ctx, "<Seq ℤ_2^64>"),
-            Context::parse(&ctx, "<Seq machine.UInt64>")
-        ].into_iter(),
+    rt_int.insert_leaf(Context::parse(&ctx, "
+              <PosInt 16 BigEndian>
+            ~ <Seq   <Digit 16>
+                   ~ ℤ_2^64
+                   ~ machine.UInt64 >
+        "),
         nested::repr_tree::ReprLeaf::from_view( digits_view.clone() )
     );
-    //
+    //ΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛ
     //
 
+
+    /* convert to little endian
+     */
     ctx.read().unwrap().morphisms.apply_morphism(
         rt_int.clone(),
         &Context::parse(&ctx, "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>~ℤ_2^64~machine.UInt64>"),
         &Context::parse(&ctx, "ℕ ~ <PosInt 16 LittleEndian> ~ <Seq <Digit 16>~ℤ_2^64~machine.UInt64>")
     );
+
+    /* convert to decimal
+     */
     ctx.read().unwrap().morphisms.apply_morphism(
         rt_int.clone(),
         &Context::parse(&ctx, "ℕ ~ <PosInt 16 LittleEndian> ~ <Seq <Digit 16>~ℤ_2^64~machine.UInt64>"),
         &Context::parse(&ctx, "ℕ ~ <PosInt 10 LittleEndian> ~ <Seq <Digit 10>~ℤ_2^64~machine.UInt64>")
     );
+
+    /* convert back to big endian
+     */
     ctx.read().unwrap().morphisms.apply_morphism(
         rt_int.clone(),
         &Context::parse(&ctx, "ℕ ~ <PosInt 10 LittleEndian> ~ <Seq <Digit 10>~ℤ_2^64~machine.UInt64>"),
         &Context::parse(&ctx, "ℕ ~ <PosInt 10 BigEndian> ~ <Seq <Digit 10>~ℤ_2^64~machine.UInt64>")
     );
 
-    let dec_digits_view = ReprTree::descend(&rt_int,
-        Context::parse(&ctx, "
-                <PosInt 10 BigEndian>
-                ~< Seq <Digit 10>~ℤ_2^64~machine.UInt64 >
-        ")
-    ).expect("cant descend repr tree")
-        .read().unwrap()
-        .get_port::<dyn SequenceView<Item = usize>>().unwrap()
-        .map(
-            /* TODO: call morphism
-             */
-            |digit| {
-                TerminalAtom::from(
-                    char::from_digit(*digit as u32, 10)
-                )
-            }
-        )
-        .to_grid_horizontal();
+    /* map seq of u64 digits to seq of chars
+     * and add this projection to the ReprTree
+     */
 
-    let hex_digits_view =
-        ReprTree::descend(
-            &rt_int,
-            Context::parse(&ctx, "
-                <PosInt 16 BigEndian>
-                ~<Seq  <Digit 16>  >
-                ~<List <Digit 16>
-                       ~Char>")
-        ).expect("cant descend")
+    //
+    //VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
+    let dec_digits_view =
+        rt_int.descend(Context::parse(&ctx, "
+                < PosInt 10 BigEndian >
+              ~ < Seq  <Digit 10>
+                      ~ ℤ_2^64
+                      ~ machine.UInt64 >
+        ")).expect("cant descend repr tree")
         .read().unwrap()
-        .get_port::<dyn ListView<char>>().unwrap()
-        .to_sequence()
-        .to_grid_horizontal()
-        .map_item(|_pt,c| TerminalAtom::new(*c, TerminalStyle::fg_color((30,90,200))));
+        .get_port::<dyn SequenceView<Item = u64>>().unwrap()
+        .map(|digit| TerminalAtom::from(char::from_digit(*digit as u32, 10)))
+        .to_grid_horizontal();
+    //ΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛ
+    //
+    //VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
+    let hex_digits_view =
+        rt_int.descend(Context::parse(&ctx, "
+             < PosInt 16 BigEndian >
+           ~ < Seq  <Digit 16>
+                   ~ ℤ_2^64
+                   ~ machine.UInt64 >
+        ")).expect("cant descend")
+        .read().unwrap()
+        .view_seq::< u64 >()
+        .map(|digit| TerminalAtom::from(char::from_digit(*digit as u32, 16)))
+        .to_grid_horizontal();
+    //ΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛ
+    //
+
+
 
     /* setup terminal
      */
@@ -198,11 +214,19 @@ async fn main() {
                 .display_view()
                 .offset(Vector2::new(3,2)));
 
-        comp.push(dec_digits_view.offset(Vector2::new(3,4)));
-        comp.push(hex_digits_view.offset(Vector2::new(3,5)));
+        comp.push(nested_tty::make_label("dec: ").offset(Vector2::new(3,4)));
+        comp.push(dec_digits_view.offset(Vector2::new(8,4)).map_item(|_,a| {
+            a.add_style_back(TerminalStyle::fg_color((30,90,200)))
+        }));
+
+        comp.push(nested_tty::make_label("hex: ").offset(Vector2::new(3,5)));
+        comp.push(hex_digits_view.offset(Vector2::new(8,5)).map_item(|_,a| {
+            a.add_style_back(TerminalStyle::fg_color((200, 200, 30)))
+        }));
     }
 
     /* write the changes in the view of `term_port` to the terminal
      */
     app.show().await.expect("output error!");
 }
+

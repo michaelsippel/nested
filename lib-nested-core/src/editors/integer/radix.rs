@@ -21,13 +21,13 @@ use {
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub trait PosIntProjections {
-    fn transform_radix(&self, dst_radix: usize) -> OuterViewPort<dyn SequenceView<Item = usize>>;
+    fn transform_radix(&self, dst_radix: u64) -> OuterViewPort<dyn SequenceView<Item = u64>>;
 //    fn to_digits(&self) -> OuterViewPort<dyn SequenceView<Item = usize>>;
 }
 
 impl PosIntProjections for OuterViewPort<dyn PositionalUInt> {
-    fn transform_radix(&self, dst_radix: usize) -> OuterViewPort<dyn SequenceView<Item = usize>> {
-        let port = ViewPort::<dyn SequenceView<Item = usize>>::new();
+    fn transform_radix(&self, dst_radix: u64) -> OuterViewPort<dyn SequenceView<Item = u64>> {
+        let port = ViewPort::<dyn SequenceView<Item = u64>>::new();
         port.add_update_hook(Arc::new(self.0.clone()));
 
 //        let mut vec_port = ViewPort::new();
@@ -39,7 +39,7 @@ impl PosIntProjections for OuterViewPort<dyn PositionalUInt> {
         }));
 
         self.add_observer(proj.clone());
-        port.set_view(Some(proj as Arc<dyn SequenceView<Item = usize>>));
+        port.set_view(Some(proj as Arc<dyn SequenceView<Item = u64>>));
         port.into_outer()
     }
 /*
@@ -61,9 +61,9 @@ impl PosIntProjections for OuterViewPort<dyn PositionalUInt> {
 
 pub struct RadixProjection {
     src: Option<Arc<dyn PositionalUInt>>,
-    dst_radix: usize,
-    dst_digits: VecBuffer<usize>,
-    cast: Arc<RwLock<ObserverBroadcast<dyn SequenceView<Item = usize>>>>
+    dst_radix: u64,
+    dst_digits: VecBuffer<u64>,
+    cast: Arc<RwLock<ObserverBroadcast<dyn SequenceView<Item = u64>>>>
 }
 
 impl View for RadixProjection {
@@ -71,9 +71,9 @@ impl View for RadixProjection {
 }
 
 impl SequenceView for RadixProjection {
-    type Item = usize;
+    type Item = u64;
 
-    fn get(&self, idx: &usize) -> Option<usize> {
+    fn get(&self, idx: &usize) -> Option<u64> {
         if *idx < self.dst_digits.len() {
             Some(self.dst_digits.get(*idx))
         } else {
@@ -87,7 +87,7 @@ impl SequenceView for RadixProjection {
 }
 
 impl PositionalUInt for RadixProjection {
-    fn get_radix(&self) -> usize {
+    fn get_radix(&self) -> u64 {
         self.dst_radix
     }
 }

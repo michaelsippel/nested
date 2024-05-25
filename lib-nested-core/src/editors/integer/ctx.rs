@@ -39,7 +39,7 @@ pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
                     .apply_substitution(&|k|σ.get(k).cloned()).clone()
                 ).expect("cant descend")
                     .read().unwrap()
-                    .view_seq::< usize >();
+                    .view_seq::< u64 >();
 
                 src_rt.write().unwrap().insert_leaf(
                         vec![
@@ -56,6 +56,8 @@ pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
             }
         }
     );
+
+
 
 
 
@@ -79,7 +81,7 @@ pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
                     .apply_substitution(&|k|σ.get(k).cloned()).clone()
                 ).expect("cant descend")
                     .read().unwrap()
-                    .view_seq::< usize >();
+                    .view_seq::< u64 >();
 
                 src_rt.write().unwrap().insert_leaf(
                         vec![
@@ -113,14 +115,14 @@ pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
                 let src_radix = match σ.get(&laddertypes::TypeID::Var(
                     ctx.read().unwrap().get_var_typeid("SrcRadix").unwrap()
                 )) {
-                    Some(laddertypes::TypeTerm::Num(n)) => *n as usize,
+                    Some(laddertypes::TypeTerm::Num(n)) => *n as u64,
                     _ => 0
                 };
 
                 let dst_radix = match σ.get(&laddertypes::TypeID::Var(
                     ctx.read().unwrap().get_var_typeid("DstRadix").unwrap()
                 )) {
-                    Some(laddertypes::TypeTerm::Num(n)) => *n as usize,
+                    Some(laddertypes::TypeTerm::Num(n)) => *n as u64,
                     _ => 0
                 };
 
@@ -134,7 +136,7 @@ pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
 
                 let dst_digits_port =
                     src_digits_rt.read().unwrap()
-                        .view_seq::<usize>()
+                        .view_seq::<u64>()
                         .to_positional_uint( src_radix )
                         .transform_radix( dst_radix )
                 ;
