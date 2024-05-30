@@ -13,6 +13,30 @@ use {
 };
 
 #[test]
+fn halo_type() {
+    let ctx = Arc::new(RwLock::new(Context::new()));
+
+    let mut rt1 = ReprTree::new_arc(Context::parse(&ctx, "ℕ"));
+    let mut rt2 = ReprTree::new_arc(Context::parse(&ctx, "<PosInt 10 BigEndian>"));
+    rt1.insert_branch( rt2.clone() );
+    assert_eq!( rt2.read().unwrap().get_halo_type(), &Context::parse(&ctx, "ℕ") );
+    
+    let mut rt3 = ReprTree::new_arc(Context::parse(&ctx, "<Seq <Digit 10>>"));
+    rt2.insert_branch( rt3.clone() );
+    assert_eq!( rt3.read().unwrap().get_halo_type(), &Context::parse(&ctx, "ℕ~<PosInt 10 BigEndian>") );
+
+    let rt4 = ReprTree::new_arc(Context::parse(&ctx, "<List <Digit 10>>"));
+    rt3.insert_branch( rt4.clone() );
+    assert_eq!( rt4.read().unwrap().get_halo_type(), &Context::parse(&ctx, "ℕ~<PosInt 10 BigEndian>~<Seq <Digit 10>>") );
+
+    
+    let mut r = ReprTree::new_arc(Context::parse(&ctx, "ℕ"));
+    r.create_branch(Context::parse(&ctx, "<PosInt 10 BigEndian>~<Seq <Digit 10>>"));
+    assert_eq!( r.descend(Context::parse(&ctx, "<PosInt 10 BigEndian>")).unwrap().read().unwrap().get_halo_type(), &Context::parse(&ctx, "ℕ") );
+    assert_eq!( r.descend(Context::parse(&ctx, "<PosInt 10 BigEndian>~<Seq <Digit 10>>")).unwrap().read().unwrap().get_halo_type(), &Context::parse(&ctx, "ℕ~<PosInt 10 BigEndian>") );
+}
+
+#[test]
 fn char_view() {
     let ctx = Arc::new(RwLock::new(Context::new()));
     crate::editors::digit::init_ctx( ctx.clone() );

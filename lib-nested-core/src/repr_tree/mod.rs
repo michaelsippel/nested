@@ -44,6 +44,7 @@ pub struct ReprLeaf {
 
 #[derive(Clone)]
 pub struct ReprTree {
+    halo: TypeTerm,
     type_tag: TypeTerm,
     branches: HashMap<TypeTerm, Arc<RwLock<ReprTree>>>,
     leaf: Option< ReprLeaf >
@@ -207,8 +208,13 @@ impl ReprLeaf {
 
 impl ReprTree {
     pub fn new(type_tag: impl Into<TypeTerm>) -> Self {
+        let type_tag = type_tag.into();
+
+        assert!(type_tag.is_flat());
+        
         ReprTree {
-            type_tag: type_tag.into(),
+            halo: TypeTerm::unit(),
+            type_tag: type_tag.clone(),
             branches: HashMap::new(),
             leaf: None
         }
@@ -222,8 +228,31 @@ impl ReprTree {
         &self.type_tag
     }
 
+    pub fn set_halo(&mut self, halo_type: impl Into<TypeTerm>) {
+        self.halo = halo_type.into();
+        for (branch_type, branch) in self.branches.iter() {
+            branch.write().unwrap().set_halo( TypeTerm::Ladder(vec![
+                    self.halo.clone(),
+                    self.type_tag.clone()
+                ]).normalize()
+            );
+        }
+    }
+
+    pub fn get_halo_type(&self) -> &TypeTerm {
+        &self.halo
+    }
+
     pub fn insert_branch(&mut self, repr: Arc<RwLock<ReprTree>>) {
-        self.branches.insert(repr.clone().read().unwrap().type_tag.clone(), repr.clone());
+        let branch_type = repr.read().unwrap().get_type().clone();
+
+        assert!(branch_type.is_flat());
+
+        repr.write().unwrap().set_halo( TypeTerm::Ladder(vec![
+            self.halo.clone(),
+            self.type_tag.clone()
+        ]).normalize() );
+        self.branches.insert(branch_type, repr.clone());
     }
 
     pub fn from_char(ctx: &Arc<RwLock<Context>>, c: char ) -> Arc<RwLock<Self>> {
@@ -249,7 +278,6 @@ impl ReprTree {
         rt.leaf = Some(ReprLeaf::from_singleton_buffer(buf));
         Arc::new(RwLock::new(rt))
     }
-
 
     pub fn from_vec_buffer<T>( type_tag: impl Into<TypeTerm>, buf: VecBuffer<T> ) -> Arc<RwLock<Self>>
     where T: Clone + Send + Sync + 'static
@@ -437,21 +465,16 @@ impl ReprTreeExt for Arc<RwLock<ReprTree>> {
     }
 
     fn create_branch(&mut self, rung: impl Into<TypeTerm>) {
-        let lnf = rung.into().get_lnf_vec();
-        eprintln!("lnf ={:?}",lnf);
+        let mut lnf = rung.into().get_lnf_vec().into_iter();
+        if let Some(rung) = lnf.next() {
+            let mut parent = ReprTree::new_arc( rung );
+            self.insert_branch( parent.clone() );
 
-        let mut child = None;
-        for rung in lnf.iter().rev() {
-            eprintln!("create {:?}",rung);
-            let mut parent = ReprTree::new_arc( rung.clone() );
-            if let Some(c) = child.take() {
-                parent.insert_branch( c );
+            for rung in lnf {
+                let r = ReprTree::new_arc( rung );
+                parent.insert_branch(r.clone());
+                parent = r;
             }
-            child = Some(parent);
-        }
-
-        if let Some(child) = child.take() {
-            self.insert_branch(child);
         }
     }
 
