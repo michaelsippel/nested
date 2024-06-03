@@ -35,11 +35,22 @@ pub struct ListEditor {
 
 impl ListEditor {
     pub fn new(
+       ctx: Arc<RwLock<Context>>,
+       typ: TypeTerm 
+    ) -> Self {
+        Self::with_data(
+            ctx,
+            typ,
+            VecBuffer::new()
+        )
+    }
+
+    pub fn with_data(
         ctx: Arc<RwLock<Context>>,
         typ: TypeTerm,
+        data: VecBuffer<Arc<RwLock<EditTree>>>
     ) -> Self {
         let cursor = SingletonBuffer::new(ListCursor::default());
-        let data : VecBuffer<Arc<RwLock<EditTree>>> = VecBuffer::new();
 
         ListEditor {
             mode_port: cursor

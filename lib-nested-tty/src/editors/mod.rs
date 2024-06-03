@@ -21,7 +21,6 @@ use {
 pub fn edittree_make_char_view(
     node: EditTree
 ) -> EditTree {
-    eprintln!("nested-tty: EditTree make char-view");
     node.disp.view
         .write().unwrap()
         .insert_branch(ReprTree::from_view(

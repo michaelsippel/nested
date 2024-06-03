@@ -55,7 +55,6 @@ impl Context {
                 None => Vec::new()
             },
             parent,
-
             edittree_hook: Arc::new(|_et, _t| {})
         }
     }
