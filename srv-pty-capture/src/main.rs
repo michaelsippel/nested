@@ -2,7 +2,7 @@
 
 use {
     cgmath::Point2,
-    nested::terminal::{TerminalAtom, TerminalStyle},
+    nested_tty::{TerminalAtom, TerminalStyle},
     std::{
         fs::File,
         io::{stdin, Read, Write},

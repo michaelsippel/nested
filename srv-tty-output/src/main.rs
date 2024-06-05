@@ -1,6 +1,6 @@
 use {
     cgmath::{Point2, Vector2},
-    nested::terminal::{TerminalAtom, TerminalStyle},
+    nested_tty::{TerminalAtom, TerminalStyle},
     std::io::{stdout, Read, Write},
     termion::raw::IntoRawMode,
 };

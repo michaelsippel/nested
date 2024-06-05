@@ -2,9 +2,13 @@
 members = [
     "lib-nested-core",
     "lib-nested-tty",
+
+    "srv-tty-output",
+    "srv-pty-capture",
+
     "examples/tty-01-hello",
     "examples/tty-02-digit",
     "examples/tty-03-string",
-    "examples/tty-04-posint"
+    "examples/tty-04-posint",
 ]
 

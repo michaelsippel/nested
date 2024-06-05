@@ -1,6 +1,6 @@
 [package]
 authors = ["Michael Sippel <micha@fragmental.art>"]
-name = "display-server-tty"
+name = "srv-tty-output"
 version = "0.1.0"
 edition = "2018"
 
