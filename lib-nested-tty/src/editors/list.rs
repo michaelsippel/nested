@@ -7,6 +7,7 @@ use {
         repr_tree::{Context, ReprTree},
         editors::list::*,
         edit_tree::{TreeCursor, TreeNav, TreeNavResult, EditTree},
+        repr_tree::{ReprTreeExt, ReprLeaf}
     },
     crate::{
         DisplaySegment,
@@ -80,10 +81,12 @@ impl PTYListStyle {
             editor.get_cursor_port(),
             editor.get_data_port()
         );
-        let seg_seq = seg_seq.read().unwrap();
+
+        let seg_seq0 = seg_seq.read().unwrap();
+        let seg_seq = seg_seq0.get_view();
+        drop(seg_seq0);
 
         seg_seq
-            .get_view()
             .map(move |segment| segment.display_view())
             .separate(make_label(&self.style.1))
             .wrap(make_label(&self.style.0), make_label(&self.style.2))
@@ -92,15 +95,14 @@ impl PTYListStyle {
     }
 
     pub fn for_node(node: &mut EditTree, style: (&str, &str, &str)) {
+        let editor = node.get_edit::<ListEditor>().unwrap();
+        let editor = editor.read().unwrap();
+        let pty_view = Self::new(style).pty_view(&editor);
         node.disp.view
-            .write().unwrap()
-            .insert_branch(ReprTree::from_view(
+            .attach_leaf_to(
                 Context::parse(&node.ctx, "TerminalView"),
-                Self::new(style)
-                    .pty_view(
-                        &node.get_edit::<ListEditor>().unwrap().read().unwrap()
-                )
-            ));
+                pty_view
+            );
     }
 }
 
@@ -226,6 +228,8 @@ impl PTYListController {
                     self.depth.map(|d| d+1)
                 );
 
+                if let Some(new_edittree) = new_edittree {
+
                 let mut ne = new_edittree.get();
                 match ne.send_cmd_obj(cmd_obj.clone()) {
                     TreeNavResult::Continue => {
@@ -236,6 +240,12 @@ impl PTYListController {
                     TreeNavResult::Exit => {
                         TreeNavResult::Exit
                     }
+                }
+
+                } else {
+
+                    panic!("cant get edit tree");
+                    TreeNavResult::Continue
                 }
             },
             ListCursorMode::Select => {

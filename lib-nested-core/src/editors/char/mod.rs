@@ -32,16 +32,17 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
                 let ctx = ctx.clone();
                 move |rt, σ| {
                     {
-                        let mut rt = rt.write().unwrap();
-                        if let Some(buf) = rt.singleton_buffer::<char>() {
+                        let mut b = rt.write().unwrap().singleton_buffer::<char>();
+                        if let Some(buf) = b {
                             // buffer already exists
                         } else {
                             // create char buffer
-                            rt.insert_leaf(
+                            rt.write().unwrap().insert_leaf(
                                 vec![].into_iter(),
                                 ReprLeaf::from_singleton_buffer(
-                                SingletonBuffer::new('\0')
-                            ));
+                                    SingletonBuffer::new('\0')
+                                )
+                            );
                         }
                     }
 
@@ -53,13 +54,10 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
                         SingletonBuffer::<usize>::new(0).get_port()
                     );
 
-                    rt.write().unwrap()
-                        .insert_branch(
-                            ReprTree::from_singleton_buffer(
-                                Context::parse(&ctx, "EditTree"),
-                                SingletonBuffer::new(edittree)
-                            )
-                        );
+                    rt.insert_leaf(
+                        Context::parse(&ctx, "EditTree"),
+                        ReprLeaf::from_singleton_buffer(SingletonBuffer::new(edittree))
+                    );
                 }
             }
         );

@@ -40,6 +40,7 @@ pub struct ReprLeaf {
 
     /// keepalive for the observer that updates the buffer from in_port
     keepalive: Option<Arc<dyn Any + Send + Sync>>,
+    in_keepalive: Option<Arc<dyn Any + Send + Sync>>,
 }
 
 #[derive(Clone)]
@@ -72,15 +73,16 @@ impl ReprLeaf {
         V::Msg: Clone
     {
         let mut in_port = ViewPort::<V>::new();
-        in_port.attach_to(src_port);
+        let in_keepalive = in_port.attach_to(src_port);
 
-        let mut buf_port = ViewPort::<V>::new();
-        buf_port.attach_to(in_port.outer());
+        let mut out_port = ViewPort::<V>::new();
+        let out_keepalive = out_port.attach_to(in_port.outer());
 
         ReprLeaf {
-            keepalive: None,
+            keepalive: Some(out_keepalive),
+            in_keepalive: Some(in_keepalive),
             in_port: in_port.inner().into(),
-            out_port: buf_port.into(),
+            out_port: out_port.into(),
             data: None, 
         }
     }
@@ -89,23 +91,55 @@ impl ReprLeaf {
     where V: View + ?Sized + 'static,
          V::Msg: Clone
     {
+        self.keepalive = None;
+        self.in_keepalive = None;
+
         let ip = self.in_port.clone()
             .downcast::<V>().ok()
             .unwrap();
+        ip.0.detach();
 
-        ip.0.update_hooks.write().unwrap().clear();
-        ip.set_view(None)
-            .write().unwrap()
-            .reset(None);
+        if self.data.is_none() {
+            let mut op = self.out_port.clone()
+                .downcast::<V>().ok()
+                .unwrap();
+
+            op.detach();
+            self.keepalive = Some(op.attach_to(ip.0.outer()));
+        }
+    }
+
+    pub fn detach_vec<Item>(&mut self)
+    where Item: Clone + Send + Sync + 'static
+    {
+        self.keepalive = None;
+        self.in_keepalive = None;
+
+        let ip = self.in_port.clone()
+            .downcast::<dyn ListView<Item>>().ok()
+            .unwrap();
+
+        ip.0.detach();
+
+        if let Some(data) = self.data.as_mut() {
+            let mut op = self.out_port.clone()
+                .downcast::<RwLock<Vec<Item>>>().ok()
+                .unwrap();
+            op.detach();
+
+            let data = data.clone().downcast::< RwLock<Vec<Item>> >().ok().unwrap();
+            let buffer = VecBuffer::with_data_arc_port(data, op.inner());
+            self.keepalive = Some(buffer.attach_to(ip.0.outer()))
+        }
     }
 
     pub fn attach_to<V>(&mut self, src_port: OuterViewPort<V>)
     where V: View + ?Sized + 'static,
         V::Msg: Clone
     {
-        self.in_port.clone()
+        self.in_keepalive = Some(self.in_port.clone()
             .downcast::<V>().ok().unwrap()
-            .0.attach_to( src_port );
+            .0.attach_to( src_port ));
     }
 
     pub fn from_singleton_buffer<T>( buffer: SingletonBuffer<T> ) -> Self
@@ -113,6 +147,7 @@ impl ReprLeaf {
     {
         let in_port = ViewPort::<dyn SingletonView<Item = T>>::new();
         ReprLeaf {
+            in_keepalive: None,
             keepalive: Some(buffer.attach_to(in_port.outer())),
             in_port: in_port.inner().into(),
             out_port: buffer.get_port().0.into(),
@@ -125,6 +160,7 @@ impl ReprLeaf {
     {
         let in_port = ViewPort::< dyn ListView<T> >::new();
         ReprLeaf {
+            in_keepalive: None,
             keepalive: Some(buffer.attach_to(in_port.outer())),
             in_port: in_port.inner().into(),
             out_port: buffer.get_port().0.into(),
@@ -172,7 +208,6 @@ impl ReprLeaf {
 
         let data_arc =
             if let Some(data) = self.data.as_ref() {
-                eprintln!("downcast existing vec-data");
                 data.clone().downcast::<RwLock<Vec<T>>>().ok()
             } else {
                 vec_port.update();
@@ -188,9 +223,6 @@ impl ReprLeaf {
             };
 
         if let Some(data_arc) = data_arc {
-            eprintln!("ReprLeaf: have Vec-like data-arc");
-            eprintln!("LEN = {}", data_arc.read().unwrap().len());
-
             self.data = Some(data_arc.clone() as Arc<dyn Any + Send + Sync>);
             let buf = VecBuffer::with_data_arc_port(data_arc, vec_port.inner());
             self.keepalive = Some(buf.attach_to(
@@ -252,6 +284,22 @@ impl ReprTree {
         &self.halo
     }
 
+    pub fn get_leaf_types(&self) -> Vec< TypeTerm > {
+        let mut leaf_types = Vec::new();
+        if self.leaf.is_some() {
+            leaf_types.push( self.get_type().clone() );
+        }
+        for (branch_type, branch) in self.branches.iter() {
+            for t in branch.read().unwrap().get_leaf_types() {
+                leaf_types.push(TypeTerm::Ladder(vec![
+                    self.get_type().clone(),
+                    t
+                ]).normalize())
+            }
+        }
+        leaf_types
+    }
+
     pub fn insert_branch(&mut self, repr: Arc<RwLock<ReprTree>>) {
         let branch_type = repr.read().unwrap().get_type().clone();
 
@@ -261,6 +309,7 @@ impl ReprTree {
             self.halo.clone(),
             self.type_tag.clone()
         ]).normalize() );
+
         self.branches.insert(branch_type, repr.clone());
     }
 
@@ -307,12 +356,20 @@ impl ReprTree {
         V::Msg: Clone
     {
         if let Some(rung_type) = type_ladder.next() {
-            if let Some(next_repr) = self.branches.get(&rung_type) {
-                next_repr.write().unwrap().attach_leaf_to(type_ladder, src_port);
+            if &rung_type == self.get_type() {
+                if let Some(leaf) = self.leaf.as_mut() {
+                    leaf.attach_to(src_port);
+                } else {
+                    self.leaf = Some(ReprLeaf::from_view(src_port));
+                }
             } else {
-                let mut next_repr = ReprTree::new(rung_type.clone());
-                next_repr.attach_leaf_to(type_ladder, src_port);
-                self.insert_branch(Arc::new(RwLock::new(next_repr)));
+                if let Some(next_repr) = self.branches.get(&rung_type) {
+                    next_repr.write().unwrap().attach_leaf_to(type_ladder, src_port);
+                } else {
+                    let mut next_repr = ReprTree::new(rung_type.clone());
+                    next_repr.attach_leaf_to(type_ladder, src_port);
+                    self.insert_branch(Arc::new(RwLock::new(next_repr)));
+                }
             }
         } else {
             if let Some(leaf) = self.leaf.as_mut() {
@@ -337,13 +394,13 @@ impl ReprTree {
         }
     }
 
-    pub fn detach(&mut self, ctx: &Arc<RwLock<Context>>) {        
+    pub fn detach(&mut self, ctx: &Arc<RwLock<Context>>) {
         if let Some(leaf) = self.leaf.as_mut() {
             if self.type_tag == Context::parse(&ctx, "Char") {
                 leaf.detach::<dyn SingletonView<Item = char>>();
             }
             if self.type_tag == Context::parse(&ctx, "<Vec Char>") {
-                leaf.detach::<dyn ListView<char>>();
+                leaf.detach_vec::<char>();
             }
             if self.type_tag == Context::parse(&ctx, "<List Char>") {
                 leaf.detach::<dyn ListView<char>>();
@@ -393,7 +450,15 @@ impl ReprTree {
     }
 
     pub fn descend(rt: &Arc<RwLock<Self>>, dst_type: impl Into<TypeTerm>) -> Option<Arc<RwLock<ReprTree>>> {
-        ReprTree::descend_ladder(rt, dst_type.into().get_lnf_vec().into_iter())
+        let mut lnf = dst_type.into().get_lnf_vec();
+        if lnf.len() > 0 {
+            if lnf[0] == rt.get_type() {
+                lnf.remove(0);
+            }
+            ReprTree::descend_ladder(rt, lnf.into_iter())
+        } else {
+            Some(rt.clone())
+        }
     }
 
     pub fn ascend(rt: &Arc<RwLock<Self>>, type_term: impl Into<TypeTerm>) -> Arc<RwLock<ReprTree>> {
@@ -487,13 +552,16 @@ pub trait ReprTreeExt {
     fn create_branch(&mut self, rung: impl Into<TypeTerm>);
     fn descend(&self, target_type: impl Into<TypeTerm>) -> Option<Arc<RwLock<ReprTree>>>;
 
-    fn get_port<V: View + ?Sized + 'static>(&self) -> Option<OuterViewPort<V>> where V::Msg: Clone;
     fn attach_leaf_to<V: View + ?Sized + 'static>(&self, t: impl Into<TypeTerm>, v: OuterViewPort<V>) where V::Msg: Clone;
+    fn get_port<V: View + ?Sized + 'static>(&self) -> Option<OuterViewPort<V>> where V::Msg: Clone;
 
     fn view_char(&self) -> OuterViewPort<dyn SingletonView<Item = char>>;
     fn view_u8(&self) -> OuterViewPort<dyn SingletonView<Item = u8>>;
     fn view_u64(&self) -> OuterViewPort<dyn SingletonView<Item = u64>>;
     fn view_usize(&self) -> OuterViewPort<dyn SingletonView<Item = usize>>;
+
+    fn view_seq<T: Send + Sync + 'static>(&self) -> OuterViewPort<dyn SequenceView<Item = T>>;
+    fn view_list<T: Clone + Send + Sync + 'static>(&self) -> OuterViewPort<dyn ListView<T>>;
 
     fn singleton_buffer<T: Clone + Send + Sync + 'static>(&self) -> SingletonBuffer<T>;
     fn vec_buffer<T: Clone + Send + Sync + 'static>(&self) -> VecBuffer<T>;
@@ -552,6 +620,14 @@ impl ReprTreeExt for Arc<RwLock<ReprTree>> {
 
     fn view_usize(&self) -> OuterViewPort<dyn SingletonView<Item = usize>> {
         self.read().unwrap().view_usize()
+    }
+
+    fn view_seq<T: Send + Sync + 'static>(&self) -> OuterViewPort<dyn SequenceView<Item = T>> {
+        self.read().unwrap().view_seq::<T>()
+    }
+
+    fn view_list<T: Clone + Send + Sync + 'static>(&self) -> OuterViewPort<dyn ListView<T>> {
+        self.read().unwrap().view_list::<T>()
     }
 
     fn singleton_buffer<T: Clone + Send + Sync + 'static>(&self) -> SingletonBuffer<T> {

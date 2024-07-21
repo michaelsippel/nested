@@ -17,7 +17,6 @@ use {
     }
 };
 
-
 pub fn edittree_make_char_view(
     node: EditTree
 ) -> EditTree {

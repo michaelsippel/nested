@@ -179,7 +179,7 @@ impl Context {
         &self,
         rt: Arc<RwLock<ReprTree>>,
         depth: OuterViewPort<dyn SingletonView<Item = usize>>
-    ) -> SingletonBuffer<EditTree> {
+    ) -> Option<SingletonBuffer<EditTree>> {
         let ladder = TypeTerm::Ladder(vec![
                 rt.read().unwrap().get_type().clone(),
                 self.type_term_from_str("EditTree").expect("")
@@ -194,14 +194,19 @@ impl Context {
         if let Some(new_edittree) =
             rt.descend(self.type_term_from_str("EditTree").unwrap())
         {
+            let typ = rt.read().unwrap().get_type().clone();
             let buf = new_edittree.singleton_buffer::<EditTree>();
             (*self.edittree_hook)(
                 &mut *buf.get_mut(),
-                rt.read().unwrap().get_type().clone()
+                typ
             );
-            buf
+            Some(buf)
         } else {
-            unreachable!();
+            eprintln!("cant find edit tree repr {} ~Ψ~ {}",
+                self.type_term_to_str(rt.read().unwrap().get_halo_type()),
+                self.type_term_to_str(rt.read().unwrap().get_type())
+            );
+            None
         }
     }
 }

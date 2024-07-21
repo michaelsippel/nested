@@ -319,11 +319,13 @@ impl ListEditor {
                 let mut b = item.ctrl.spillbuf.write().unwrap();
 
                 let rt = ReprTree::new_arc(self.typ.clone());
-                let edittree = self.ctx.read().unwrap()
+                let mut et = self.ctx.read().unwrap()
                     .setup_edittree(
                         rt,
                         self.depth.map(|d| d+1)
                     );
+
+                if let Some(edittree) = et.as_mut(){
 
                 let mut tail_node = edittree.get_mut();
                 tail_node.goto(TreeCursor::home());
@@ -353,6 +355,8 @@ impl ListEditor {
                 self.insert(
                     edittree.value.clone()
                 );
+
+                }
 
             } else {
                 self.up();
