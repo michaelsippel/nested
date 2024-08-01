@@ -37,7 +37,7 @@ fn rebuild_projections(
     repr_tree: Arc<RwLock<ReprTree>>,
     morph_types: Vec< (laddertypes::TypeTerm, laddertypes::TypeTerm) >
 ) {
-    repr_tree.write().unwrap().detach(&ctx);
+//    repr_tree.write().unwrap().detach(&ctx);
     for (src_type, dst_type) in morph_types.iter() {
         ctx.read().unwrap().morphisms.apply_morphism(
             repr_tree.clone(),
@@ -48,6 +48,8 @@ fn rebuild_projections(
 }
 
 fn setup_le_master(ctx: &Arc<RwLock<Context>>, rt_int: &Arc<RwLock<ReprTree>>) {
+    rt_int.write().unwrap().detach(&ctx);
+    
     rebuild_projections(
         ctx.clone(),
         rt_int.clone(),
@@ -81,51 +83,38 @@ fn setup_le_master(ctx: &Arc<RwLock<Context>>, rt_int: &Arc<RwLock<ReprTree>>) {
             .map(|(s,d)| (Context::parse(&ctx, s), Context::parse(&ctx, d)))
             .collect()
     );
-/*
     
-    /*
-     * map seq of chars to seq of u64 digits
-     * and add this projection to the ReprTree
-     */
-    //
-    //VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
-    let mut chars_view = rt_int.descend(Context::parse(&ctx, "
-               <PosInt 16 BigEndian>
-            ~  <Seq <Digit 16>>
-            ~  <List <Digit 16>~Char>
-        ")).expect("cant descend")
-        .read().unwrap()
-        .get_port::<dyn ListView<char>>()
-        .unwrap();
-
-    let mut digits_view = chars_view
-        .to_sequence()
-        .filter_map(
-            |digit_char|
-
-            /* TODO: call morphism for each item
-             */
-            match digit_char.to_digit(16) {
-                Some(d) => Some(d as u64),
-                None    => None
-            }
+    let rt_digitseq = 
+            rt_int.descend(Context::parse(&ctx, "
+                <PosInt 16 LittleEndian>
+                ~ <Seq <Digit 16>>
+                ~ <List <Digit 16>>
+            ")).expect("test");
+    let src_type = Context::parse(&ctx, "<Digit 16> ~ Char");
+    let dst_type = Context::parse(&ctx, "<Digit 16> ~ ℤ_2^64 ~ machine.UInt64");
+    ctx.read().unwrap().morphisms
+        .apply_list_map_morphism::<char, u64>(
+            rt_digitseq, src_type, dst_type
         );
 
-    rt_int.attach_leaf_to(Context::parse(&ctx, "
-              <PosInt 16 BigEndian>
-            ~ <Seq   <Digit 16>
-                   ~ ℤ_2^64
-                   ~ machine.UInt64 >
-        "),
-        digits_view.clone()
+    rebuild_projections(
+        ctx.clone(),
+        rt_int.clone(),
+        vec![
+            // Radix Convert
+            (
+             "ℕ ~ <PosInt 16 LittleEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ ℤ_2^64 ~ machine.UInt64>",
+             "ℕ ~ <PosInt 10 LittleEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ ℤ_2^64 ~ machine.UInt64>"
+            )            
+        ].into_iter()
+            .map(|(s,d)| (Context::parse(&ctx, s), Context::parse(&ctx, d)))
+            .collect()
     );
-
-    //ΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛ
-    //
-    */
 }
 
 fn setup_be_master(ctx: &Arc<RwLock<Context>>, rt_int: &Arc<RwLock<ReprTree>>) {
+    rt_int.write().unwrap().detach(&ctx);
+
     rebuild_projections(
         ctx.clone(),
         rt_int.clone(),
@@ -142,7 +131,7 @@ fn setup_be_master(ctx: &Arc<RwLock<Context>>, rt_int: &Arc<RwLock<ReprTree>>) {
              "ℕ ~ <PosInt 16 LittleEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char>"
             ),
 
-            // Big Endian Editor
+            // Little Endian Editor
             (
              "ℕ ~ <PosInt 16 LittleEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char>",
              "ℕ ~ <PosInt 16 LittleEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char ~ EditTree>"
@@ -160,47 +149,33 @@ fn setup_be_master(ctx: &Arc<RwLock<Context>>, rt_int: &Arc<RwLock<ReprTree>>) {
             .collect()
     );
 
-    /*
-    /*
-     * map seq of chars to seq of u64 digits
-     * and add this projection to the ReprTree
-     */
-    //
-    //VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
-    let mut chars_view = rt_int.descend(Context::parse(&ctx, "
-               <PosInt 16 BigEndian>
-            ~  <Seq <Digit 16>>
-            ~  <List <Digit 16>~Char>
-        ")).expect("cant descend")
-        .read().unwrap()
-        .get_port::<dyn ListView<char>>()
-        .unwrap();
-
-    let mut digits_view = chars_view
-        .to_sequence()
-        .filter_map(
-            |digit_char|
-
-            /* TODO: call morphism for each item
-             */
-            match digit_char.to_digit(16) {
-                Some(d) => Some(d as u64),
-                None    => None
-            }
+    
+    let rt_digitseq = 
+            rt_int.descend(Context::parse(&ctx, "
+                <PosInt 16 LittleEndian>
+                ~ <Seq <Digit 16>>
+                ~ <List <Digit 16>>
+            ")).expect("test");
+    let src_type = Context::parse(&ctx, "<Digit 16> ~ Char");
+    let dst_type = Context::parse(&ctx, "<Digit 16> ~ ℤ_2^64 ~ machine.UInt64");
+    ctx.read().unwrap().morphisms
+        .apply_list_map_morphism::<char, u64>(
+            rt_digitseq, src_type, dst_type
         );
 
-    rt_int.attach_leaf_to(Context::parse(&ctx, "
-              <PosInt 16 BigEndian>
-            ~ <Seq   <Digit 16>
-                   ~ ℤ_2^64
-                   ~ machine.UInt64 >
-        "),
-        digits_view.clone()
+    rebuild_projections(
+        ctx.clone(),
+        rt_int.clone(),
+        vec![
+            // Little Endian Editor
+            (
+             "ℕ ~ <PosInt 16 LittleEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ ℤ_2^64 ~ machine.UInt64>",
+             "ℕ ~ <PosInt 10 LittleEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ ℤ_2^64 ~ machine.UInt64>"
+            ),
+        ].into_iter()
+            .map(|(s,d)| (Context::parse(&ctx, s), Context::parse(&ctx, d)))
+            .collect()
     );
-
-    //ΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛΛ
-    //
-    */
 }
 
 #[async_std::main]
@@ -309,6 +284,47 @@ async fn main() {
             SingletonBuffer::new(0).get_port()
         ).unwrap();
 
+
+
+   let rt_digitseq = 
+            rt_int.descend(Context::parse(&ctx, "
+                <PosInt 16 LittleEndian>
+                ~ <Seq <Digit 16>>
+                ~ <List <Digit 16>>
+            ")).expect("test");
+    let src_type = Context::parse(&ctx, "<Digit 16> ~ Char");
+    let dst_type = Context::parse(&ctx, "<Digit 16> ~ ℤ_2^64 ~ machine.UInt64");
+    ctx.read().unwrap().morphisms
+        .apply_list_map_morphism::<char, u64>(
+            rt_digitseq, src_type, dst_type
+        );
+
+    let hex_digits_view = rt_int.descend(Context::parse(&ctx, "
+              <PosInt 16 LittleEndian>
+            ~ <Seq <Digit 16> >
+            ~ <List <Digit 16>
+                    ~ ℤ_2^64
+                    ~ machine.UInt64 >
+        ")).expect("descend")
+        .view_list::<u64>()
+        .map(|v| TerminalAtom::from(char::from_digit(*v as u32, 16)))
+        .to_sequence()
+        .to_grid_horizontal()
+    ;
+
+    let dec_digits_view = rt_int.descend(Context::parse(&ctx, "
+              <PosInt 10 LittleEndian>
+            ~ <Seq <Digit 10>>
+            ~ <List <Digit 10>
+                    ~ ℤ_2^64
+                    ~ machine.UInt64 >
+        ")).expect("descend")
+        .view_list::<u64>()
+        .map(|v| TerminalAtom::from(char::from_digit(*v as u32, 10)))
+        .to_sequence()
+        .to_grid_horizontal()
+    ;
+
     /* list of both editors
      */
     let mut list_editor = nested::editors::list::ListEditor::new(ctx.clone(), Context::parse(&ctx, "<Seq Char>"));
@@ -392,18 +408,15 @@ async fn main() {
 
         /* project the seq of u64 representations to a view
          */
-        /*
         comp.push(nested_tty::make_label("dec: ").offset(Vector2::new(3,7)));
         comp.push(dec_digits_view.offset(Vector2::new(8,7)).map_item(|_,a| {
             a.add_style_back(TerminalStyle::fg_color((30,90,200)))
         }));
-        */
-        /*
+
         comp.push(nested_tty::make_label("hex: ").offset(Vector2::new(3,8)));
         comp.push(hex_digits_view.offset(Vector2::new(8,8)).map_item(|_,a| {
             a.add_style_back(TerminalStyle::fg_color((200, 200, 30)))
         }));
-        */
     }
 
     /* write the changes in the view of `term_port` to the terminal

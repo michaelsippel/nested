@@ -92,14 +92,17 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
                 move |rt: &mut Arc<RwLock<ReprTree>>, σ: &std::collections::HashMap<laddertypes::TypeID, TypeTerm>| {
                     /* infer radix from type
                      */
+                    let radix_typeid = ctx.read().unwrap().get_var_typeid("Radix").unwrap();
                     let radix =
-                        match σ.get( &laddertypes::TypeID::Var(ctx.read().unwrap().get_var_typeid("Radix").unwrap()) ) {
+                        match σ.get( &laddertypes::TypeID::Var(radix_typeid) ) {
                             Some(TypeTerm::Num(n)) => (*n) as u32,
-                            _ => 0
+                            x => {
+                                eprintln!("invalid radix {:?}", x);
+                                0
+                            }
                         };
 
                     if radix <= 16 {
-
                         if let Some(src_rt) = rt.descend(Context::parse(&ctx, "Char")) {
                             /* insert projected view into ReprTree
                              */

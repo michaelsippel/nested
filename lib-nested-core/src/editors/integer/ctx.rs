@@ -16,7 +16,6 @@ use {
 
 pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
     // TODO: proper scoping
-    ctx.write().unwrap().add_varname("Radix");
     ctx.write().unwrap().add_varname("SrcRadix");
     ctx.write().unwrap().add_varname("DstRadix");
 
@@ -281,24 +280,66 @@ pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
             }
         }
     );
+/*
+    let mt = MorphismType {
+        src_type: Context::parse(&ctx, "
+              ℕ 
+            ~ <PosInt Radix BigEndian>
+            ~ <Seq <Digit Radix>>
+            ~ <List <Digit Radix>>
+            ~ <List Char>
+        "),
+        dst_type: Context::parse(&ctx, "
+              ℕ
+            ~ <PosInt Radix LittleEndian>
+            ~ <Seq <Digit Radix>>
+            ~ <List <Digit Radix>>
+            ~ <List Char>
+        ")
+    };
 
+    ctx.write().unwrap().morphisms.add_morphism(
+        mt,
+        {
+            let ctx = ctx.clone();
+            move |src_rt, σ| {    
+                let src_digits = src_rt.descend(Context::parse(&ctx, "
+                       <PosInt Radix BigEndian>
+                     ~ <Seq <Digit Radix>>
+                     ~ <List <Digit Radix>~Char >
+                    ").apply_substitution(&|k|σ.get(k).cloned()).clone()
+                ).expect("cant descend")
+                    .view_list::<char>();
 
-
+                src_rt.attach_leaf_to(
+                    Context::parse(&ctx, "
+                              < PosInt Radix LittleEndian >
+                            ~ < Seq <Digit Radix> >
+                            ~ < List <Digit Radix>~Char >
+                    ").apply_substitution(&|k| σ.get(k).cloned()).clone(),
+                    src_digits.reverse()
+                );
+            }
+        }
+    );
+*/
 
     let morphism_type = MorphismType {
         src_type: Context::parse(&ctx, "
               ℕ
             ~ <PosInt SrcRadix LittleEndian>
-            ~ <Seq   <Digit SrcRadix>
+            ~ <Seq   <Digit SrcRadix>>
+            ~ <List  <Digit SrcRadix>
                    ~ ℤ_2^64
                    ~ machine.UInt64>
         "),
         dst_type: Context::parse(&ctx, "
               ℕ
             ~ <PosInt DstRadix LittleEndian>
-            ~ <Seq   <Digit DstRadix>
+            ~ <Seq   <Digit DstRadix>>
+            ~ <List  <Digit DstRadix>
                    ~ ℤ_2^64
-                   ~ machine.UInt64  >
+                   ~ machine.UInt64>
         ")
     };
 
@@ -323,19 +364,27 @@ pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
 
                 let src_digits_rt = src_rt.descend(Context::parse(&ctx, "
                            <PosInt SrcRadix LittleEndian>
-                         ~ <Seq <Digit SrcRadix> ~ ℤ_2^64 ~ machine.UInt64 >
+                         ~ <Seq <Digit SrcRadix>>
+                         ~ <List <Digit SrcRadix>
+                                 ~ ℤ_2^64
+                                 ~ machine.UInt64 >
                     ").apply_substitution(&|k|σ.get(k).cloned()).clone()
                 ).expect("cant descend repr tree");
 
                 let dst_digits_port =
-                    src_digits_rt.view_seq::<u64>()
+                    src_digits_rt.view_list::<u64>()
+                        .to_sequence()
                         .to_positional_uint( src_radix )
-                        .transform_radix( dst_radix );
+                        .transform_radix( dst_radix )
+                        .to_list();
 
                 src_rt.attach_leaf_to(
                     Context::parse(&ctx, "
-                          <PosInt DstRadix LittleEndian>
-                        ~ <Seq <Digit DstRadix> ~ ℤ_2^64 ~ machine.UInt64>
+                        <PosInt DstRadix LittleEndian>
+                        ~ <Seq <Digit DstRadix> >
+                        ~ <List <Digit DstRadix>
+                                ~ ℤ_2^64
+                                ~ machine.UInt64 >
                     ").apply_substitution(&|k|σ.get(k).cloned()).clone(),
                     dst_digits_port
                 );
