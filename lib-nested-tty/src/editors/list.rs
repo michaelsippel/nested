@@ -223,6 +223,17 @@ impl PTYListController {
         match cur.mode {
             ListCursorMode::Insert => {
                 let rt = ReprTree::new_arc(e.typ.clone());
+
+                let ladder = laddertypes::TypeTerm::Ladder(vec![
+                    rt.read().unwrap().get_type().clone(),
+                    ctx.type_term_from_str("EditTree").expect("")
+                ]);
+                ctx.morphisms.apply_morphism(
+                    rt.clone(),
+                    &rt.get_type(),
+                    &ladder 
+                );
+
                 let new_edittree = ctx.setup_edittree(
                     rt,
                     self.depth.map(|d| d+1)
@@ -231,10 +242,11 @@ impl PTYListController {
                 if let Some(new_edittree) = new_edittree {
 
                 let mut ne = new_edittree.get();
+                let mut ne = ne.write().unwrap();
                 match ne.send_cmd_obj(cmd_obj.clone()) {
                     TreeNavResult::Continue => {
                         drop(ne);
-                        e.insert(new_edittree.value.clone());
+                        e.insert(new_edittree.value.read().unwrap().clone());
                         TreeNavResult::Continue
                     }
                     TreeNavResult::Exit => {

@@ -37,7 +37,7 @@ fn rebuild_projections(
     repr_tree: Arc<RwLock<ReprTree>>,
     morph_types: Vec< (laddertypes::TypeTerm, laddertypes::TypeTerm) >
 ) {
-//    repr_tree.write().unwrap().detach(&ctx);
+    repr_tree.write().unwrap().detach(&ctx);
     for (src_type, dst_type) in morph_types.iter() {
         ctx.read().unwrap().morphisms.apply_morphism(
             repr_tree.clone(),
@@ -47,9 +47,7 @@ fn rebuild_projections(
     }
 }
 
-fn setup_le_master(ctx: &Arc<RwLock<Context>>, rt_int: &Arc<RwLock<ReprTree>>) {
-    rt_int.write().unwrap().detach(&ctx);
-    
+fn setup_le_master(ctx: &Arc<RwLock<Context>>, rt_int: &Arc<RwLock<ReprTree>>) {   
     rebuild_projections(
         ctx.clone(),
         rt_int.clone(),
@@ -79,33 +77,17 @@ fn setup_le_master(ctx: &Arc<RwLock<Context>>, rt_int: &Arc<RwLock<ReprTree>>) {
              "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char ~ EditTree> ~ <Vec EditTree>",
              "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char> ~ EditTree"
             ),
-           ].into_iter()
-            .map(|(s,d)| (Context::parse(&ctx, s), Context::parse(&ctx, d)))
-            .collect()
-    );
-    
-    let rt_digitseq = 
-            rt_int.descend(Context::parse(&ctx, "
-                <PosInt 16 LittleEndian>
-                ~ <Seq <Digit 16>>
-                ~ <List <Digit 16>>
-            ")).expect("test");
-    let src_type = Context::parse(&ctx, "<Digit 16> ~ Char");
-    let dst_type = Context::parse(&ctx, "<Digit 16> ~ ℤ_2^64 ~ machine.UInt64");
-    ctx.read().unwrap().morphisms
-        .apply_list_map_morphism::<char, u64>(
-            rt_digitseq, src_type, dst_type
-        );
 
-    rebuild_projections(
-        ctx.clone(),
-        rt_int.clone(),
-        vec![
+            // convert to different digit-representation            
+            (
+             "ℕ ~ <PosInt 16 LittleEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char>",
+             "ℕ ~ <PosInt 16 LittleEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ ℤ_2^64 ~ machine.UInt64>"
+            ),
             // Radix Convert
             (
              "ℕ ~ <PosInt 16 LittleEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ ℤ_2^64 ~ machine.UInt64>",
              "ℕ ~ <PosInt 10 LittleEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ ℤ_2^64 ~ machine.UInt64>"
-            )            
+            ),
         ].into_iter()
             .map(|(s,d)| (Context::parse(&ctx, s), Context::parse(&ctx, d)))
             .collect()
@@ -113,8 +95,6 @@ fn setup_le_master(ctx: &Arc<RwLock<Context>>, rt_int: &Arc<RwLock<ReprTree>>) {
 }
 
 fn setup_be_master(ctx: &Arc<RwLock<Context>>, rt_int: &Arc<RwLock<ReprTree>>) {
-    rt_int.write().unwrap().detach(&ctx);
-
     rebuild_projections(
         ctx.clone(),
         rt_int.clone(),
@@ -144,35 +124,19 @@ fn setup_be_master(ctx: &Arc<RwLock<Context>>, rt_int: &Arc<RwLock<ReprTree>>) {
              "ℕ ~ <PosInt 16 LittleEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char ~ EditTree> ~ <Vec EditTree>",
              "ℕ ~ <PosInt 16 LittleEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char> ~ EditTree"
             ),
-        ].into_iter()
-            .map(|(s,d)| (Context::parse(&ctx, s), Context::parse(&ctx, d)))
-            .collect()
-    );
 
-    
-    let rt_digitseq = 
-            rt_int.descend(Context::parse(&ctx, "
-                <PosInt 16 LittleEndian>
-                ~ <Seq <Digit 16>>
-                ~ <List <Digit 16>>
-            ")).expect("test");
-    let src_type = Context::parse(&ctx, "<Digit 16> ~ Char");
-    let dst_type = Context::parse(&ctx, "<Digit 16> ~ ℤ_2^64 ~ machine.UInt64");
-    ctx.read().unwrap().morphisms
-        .apply_list_map_morphism::<char, u64>(
-            rt_digitseq, src_type, dst_type
-        );
 
-    rebuild_projections(
-        ctx.clone(),
-        rt_int.clone(),
-        vec![
-            // Little Endian Editor
+            // convert to different digit-representation            
+            (
+             "ℕ ~ <PosInt 16 LittleEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char>",
+             "ℕ ~ <PosInt 16 LittleEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ ℤ_2^64 ~ machine.UInt64>"
+            ),
+            // Radix Convert
             (
              "ℕ ~ <PosInt 16 LittleEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ ℤ_2^64 ~ machine.UInt64>",
              "ℕ ~ <PosInt 10 LittleEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ ℤ_2^64 ~ machine.UInt64>"
-            ),
-        ].into_iter()
+            )  
+         ].into_iter()
             .map(|(s,d)| (Context::parse(&ctx, s), Context::parse(&ctx, d)))
             .collect()
     );
@@ -272,7 +236,8 @@ async fn main() {
                 ~ <List Char>
             ")).expect("descend"),
             SingletonBuffer::new(0).get_port()
-        ).unwrap();
+        ).unwrap().get();
+
     let edittree_hex_be_list = ctx.read().unwrap()
         .setup_edittree(
             rt_int.descend(Context::parse(&ctx,"
@@ -282,22 +247,8 @@ async fn main() {
                 ~ <List Char>
             ")).expect("descend"),
             SingletonBuffer::new(0).get_port()
-        ).unwrap();
+        ).unwrap().get();
 
-
-
-   let rt_digitseq = 
-            rt_int.descend(Context::parse(&ctx, "
-                <PosInt 16 LittleEndian>
-                ~ <Seq <Digit 16>>
-                ~ <List <Digit 16>>
-            ")).expect("test");
-    let src_type = Context::parse(&ctx, "<Digit 16> ~ Char");
-    let dst_type = Context::parse(&ctx, "<Digit 16> ~ ℤ_2^64 ~ machine.UInt64");
-    ctx.read().unwrap().morphisms
-        .apply_list_map_morphism::<char, u64>(
-            rt_digitseq, src_type, dst_type
-        );
 
     let hex_digits_view = rt_int.descend(Context::parse(&ctx, "
               <PosInt 16 LittleEndian>
@@ -328,15 +279,15 @@ async fn main() {
     /* list of both editors
      */
     let mut list_editor = nested::editors::list::ListEditor::new(ctx.clone(), Context::parse(&ctx, "<Seq Char>"));
-    list_editor.data.push( edittree_hex_be_list.value.clone() );
-    list_editor.data.push( edittree_hex_le_list.value.clone() );
+    list_editor.data.push( edittree_hex_be_list.clone() );
+    list_editor.data.push( edittree_hex_le_list.clone() );
     let mut edittree = list_editor.into_node(SingletonBuffer::new(0).get_port());
 
     /* cursors are a bit screwed initially so fix them up
      * TODO: how to fix this generally?
      */
-    edittree_hex_be_list.get().goto(TreeCursor::none());
-    edittree_hex_le_list.get().goto(TreeCursor::none());
+    edittree_hex_be_list.write().unwrap().goto(TreeCursor::none());
+    edittree_hex_le_list.write().unwrap().goto(TreeCursor::none());
     edittree.goto(TreeCursor{
         leaf_mode: nested::editors::list::ListCursorMode::Insert,
         tree_addr: vec![1,0]
@@ -393,7 +344,7 @@ async fn main() {
         {
             let rt_edittree = rt.descend(Context::parse(&ctx, "EditTree")).expect("descend");
             let halo_type = rt_edittree.read().unwrap().get_halo_type().clone();
-            let edittree = rt_edittree.read().unwrap().get_view::<dyn r3vi::view::singleton::SingletonView<Item = EditTree>>().unwrap().get();
+            let edittree = rt_edittree.read().unwrap().get_view::<dyn r3vi::view::singleton::SingletonView<Item = Arc<RwLock<EditTree>>>>().unwrap().get().read().unwrap().clone();
 
             comp.push(  nested_tty::make_label( &ctx.read().unwrap().type_term_to_str(&halo_type) ) 
                 .map_item(|_pt, atom| atom.add_style_front(TerminalStyle::fg_color((90,90,90))))

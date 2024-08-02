@@ -24,7 +24,7 @@ use {
 
 pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
     ctx.write().unwrap().add_varname("Item");
-
+/*
     let mt = crate::repr_tree::MorphismType {
         src_type: Context::parse(&ctx, "<List Char>"),
         dst_type: Context::parse(&ctx, "<List Char~EditTree>")
@@ -66,7 +66,7 @@ pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
             }
         }
     });
-
+*/
     let mt = crate::repr_tree::MorphismType {
         src_type: Context::parse(&ctx, "<List Item>~<List EditTree>~<Vec EditTree>"),
         dst_type: Context::parse(&ctx, "<List Item>~EditTree")
@@ -94,7 +94,7 @@ pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
                     Context::parse(&ctx, "<List Item> ~ EditTree")
                         .apply_substitution(&|id| σ.get(id).cloned()).clone(),
                     ReprLeaf::from_singleton_buffer(
-                        SingletonBuffer::new(edittree_list)
+                        SingletonBuffer::new(Arc::new(RwLock::new(edittree_list)))
                     )
                 );
             } else {
@@ -115,9 +115,9 @@ pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
                 let edittree =
                     src_rt
                         .descend(Context::parse(&ctx, "<List Char>~EditTree")).unwrap()
-                        .singleton_buffer::<EditTree>();
+                        .singleton_buffer::<Arc<RwLock<EditTree>>>();
 
-                let list_edit = edittree.get().get_edit::< ListEditor >().unwrap();
+                let list_edit = edittree.get().read().unwrap().get_edit::< ListEditor >().unwrap();
                 let edittree_items = list_edit.read().unwrap().data.get_port().to_list();
 
                 src_rt.insert_leaf(

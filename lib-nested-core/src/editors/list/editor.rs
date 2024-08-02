@@ -327,7 +327,8 @@ impl ListEditor {
 
                 if let Some(edittree) = et.as_mut(){
 
-                let mut tail_node = edittree.get_mut();
+                let mut tail_node = edittree.get();
+                let mut tail_node = tail_node.write().unwrap();
                 tail_node.goto(TreeCursor::home());
 
                 for node in b.iter() {
@@ -353,7 +354,7 @@ impl ListEditor {
                 drop(tail_node);
 
                 self.insert(
-                    edittree.value.clone()
+                    edittree.value.read().unwrap().clone()
                 );
 
                 }

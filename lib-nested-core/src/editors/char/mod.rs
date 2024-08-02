@@ -56,7 +56,12 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
 
                     rt.insert_leaf(
                         Context::parse(&ctx, "EditTree"),
-                        ReprLeaf::from_singleton_buffer(SingletonBuffer::new(edittree))
+                        ReprLeaf::from_singleton_buffer(SingletonBuffer::new(Arc::new(RwLock::new(edittree))))
+                    );
+
+                    ctx.read().unwrap().setup_edittree(
+                        rt.clone(),
+                        SingletonBuffer::new(0).get_port()
                     );
                 }
             }

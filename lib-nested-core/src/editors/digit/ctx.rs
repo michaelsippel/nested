@@ -19,7 +19,7 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
 
     // todo: proper scoping of Radix variable
     ctx.write().unwrap().add_varname("Radix");
-
+/*
     let morphtype =
             crate::repr_tree::MorphismType {
                 src_type: Context::parse(&ctx, "<Digit Radix>"),
@@ -76,7 +76,7 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
                 }
             }
         );
-
+*/
     let morphtype =
             crate::repr_tree::MorphismType {
                 src_type: Context::parse(&ctx, "<Digit Radix>~Char"),

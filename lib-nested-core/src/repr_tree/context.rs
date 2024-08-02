@@ -179,25 +179,14 @@ impl Context {
         &self,
         rt: Arc<RwLock<ReprTree>>,
         depth: OuterViewPort<dyn SingletonView<Item = usize>>
-    ) -> Option<SingletonBuffer<EditTree>> {
-        let ladder = TypeTerm::Ladder(vec![
-                rt.read().unwrap().get_type().clone(),
-                self.type_term_from_str("EditTree").expect("")
-            ]);
-
-        self.morphisms.apply_morphism(
-            rt.clone(),
-            &rt.get_type(),
-            &ladder
-        );
-
+    ) -> Option<SingletonBuffer<Arc<RwLock<EditTree>>>> {
         if let Some(new_edittree) =
             rt.descend(self.type_term_from_str("EditTree").unwrap())
         {
             let typ = rt.read().unwrap().get_type().clone();
-            let buf = new_edittree.singleton_buffer::<EditTree>();
+            let buf = new_edittree.singleton_buffer::<Arc<RwLock<EditTree>>>();
             (*self.edittree_hook)(
-                &mut *buf.get_mut(),
+                &mut *buf.get().write().unwrap(),
                 typ
             );
             Some(buf)
