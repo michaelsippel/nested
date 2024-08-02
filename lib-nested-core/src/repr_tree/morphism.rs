@@ -93,6 +93,17 @@ impl MorphismBase {
                 }
             }
 
+            /* if src_item_type ~== "machine.UInt64",
+                  dst_item_type ~== "Char"
+             */
+            else if src_item_type_lnf.last() == Some(&TypeTerm::TypeID(TypeID::Fun(4))) &&
+                dst_item_type_lnf.last() == Some(&TypeTerm::TypeID(TypeID::Fun(0)))
+            {
+                if let Some((m, σ)) = self.find_list_map_morphism::< u64, char >( src_item_type, dst_item_type ) {
+                    return Some((m, σ));
+                }
+            }
+
             /* if src_item_type ~== "Char"
                   dst_item_type ~== "EditTree"
              */
