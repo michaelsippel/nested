@@ -25,7 +25,7 @@ use {
     },
     r3vi::{
         buffer::{singleton::*, vec::*},
-        view::{port::UpdateTask, list::*}
+        view::{port::UpdateTask, list::*, sequence::SequenceViewExt}
     },
     std::sync::{Arc, RwLock},
 };
@@ -43,15 +43,32 @@ async fn main() {
 
     /* Create a Representation-Tree of type <List Char>
      */
-    let rt_string = ReprTree::new_arc( Context::parse(&ctx, "<List Char>") );
+    let mut rt_string = ReprTree::new_arc( Context::parse(&ctx, "<List Char>") );
 
-    /* Setup an Editor for this ReprTree
-     * (this will add the representation <List Char>~EditTree to the ReprTree)
+    let vec = VecBuffer::<Arc<RwLock<EditTree>>>::new();
+    rt_string.insert_leaf(
+        Context::parse(&ctx, "<List EditTree> ~ <Vec EditTree>"),
+        nested::repr_tree::ReprLeaf::from_vec_buffer( vec.clone() )
+    );
+
+    let v2 = VecBuffer::<char>::new();
+    rt_string.insert_leaf(
+        Context::parse(&ctx, "<Vec Char>"),
+        nested::repr_tree::ReprLeaf::from_vec_buffer( v2.clone() )
+    );
+    ctx.read().unwrap().morphisms.apply_morphism(
+        rt_string.clone(),
+        &Context::parse(&ctx, "<List Char~EditTree> ~ <Vec EditTree>"),
+        &Context::parse(&ctx, "<List Char> ~ EditTree")
+    );
+
+    /* Setup the Editor-View for this ReprTree
      */
     let edittree_list = ctx.read().unwrap()
         .setup_edittree(
             rt_string.clone(),
-            SingletonBuffer::new(0).get_port());
+            SingletonBuffer::new(0).get_port()
+        ).unwrap();
 
     /* In order to get acces to the values that are modified by the Editor,
      * we apply a morphism that, given the List of Edit-Trees, extracts
@@ -70,7 +87,6 @@ async fn main() {
         .read().unwrap()
         .get_port::<dyn ListView<char>>()
         .unwrap();
-
 
     /* Lets add another morphism which will store the values
      * of the character-list in a `Vec<char>`
@@ -104,7 +120,7 @@ async fn main() {
          */
         let ctx = ctx.clone();
         move |ev| {
-            edittree_list.get().send_cmd_obj(ev.to_repr_tree(&ctx));
+            edittree_list.get().write().unwrap().send_cmd_obj(ev.to_repr_tree(&ctx));
         }
     });
 
@@ -127,6 +143,7 @@ async fn main() {
 
         comp.push(
             edittree_list.get()
+                .read().unwrap()
                 .display_view()
                 .offset(Vector2::new(3,2)));
 
@@ -145,8 +162,11 @@ async fn main() {
 
     /* Vec<char> to String
      */
-    let string = chars_vec.data
-        .read().unwrap()
+    let string = chars_vec
+        .get_port()
+        .to_sequence()
+        .get_view().unwrap()
+        //.data.read().unwrap()
         .iter().collect::<String>();
 
     eprintln!("value of the editor was: {}\n\n", string);

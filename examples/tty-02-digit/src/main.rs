@@ -72,13 +72,16 @@ async fn main() {
     ctx.read().unwrap().morphisms.apply_morphism(
         rt_digit.clone(),
         &Context::parse(&ctx, "<Digit 16>~Char"),
-        &Context::parse(&ctx, "<Digit 16>~ℤ_256~machine::UInt8")
+        &Context::parse(&ctx, "<Digit 16>~ℤ_2^64~machine.UInt64")
+    );
+
+    ctx.read().unwrap().morphisms.apply_morphism(
+        rt_digit.clone(),
+        &Context::parse(&ctx, "<Digit 16>~Char"),
+        &Context::parse(&ctx, "<Digit 16>~EditTree")
     );
 
     /* setup TTY-Display for DigitEditor
-     *
-     * `setup_edittree` will setup the projection
-     *    Char -> Char~EditTree
      *  and call the hook defined above with `set_edittree_hook()`
      *
      */
@@ -86,11 +89,11 @@ async fn main() {
         .setup_edittree(
             rt_digit.clone(),
             SingletonBuffer::new(0).get_port()
-        );
+        ).unwrap();
 
-    let mut digit_u8_buffer = rt_digit
-        .descend(Context::parse(&ctx, "ℤ_256~machine::UInt8")).unwrap()
-        .singleton_buffer::<u8>();
+    let mut digit_u64_buffer = rt_digit
+        .descend(Context::parse(&ctx, "ℤ_2^64~machine.UInt64")).unwrap()
+        .singleton_buffer::<u64>();
 
     /* setup terminal
      */
@@ -101,7 +104,7 @@ async fn main() {
 
         let mut edittree_digit = edittree_digit.clone();
         move |ev| {
-            edittree_digit.get().send_cmd_obj(ev.to_repr_tree(&ctx));
+            edittree_digit.get().write().unwrap().send_cmd_obj(ev.to_repr_tree(&ctx));
         }
     });
 
@@ -128,11 +131,11 @@ async fn main() {
             .offset(Vector2::new(1, 1))
         );
         comp.push(
-            edittree_digit.get().display_view()
+            edittree_digit.get().read().unwrap().display_view()
             .offset(Vector2::new(3,2))
         );
         comp.push(
-            digit_u8_buffer.get_port().map(
+            digit_u64_buffer.get_port().map(
                 |d| nested_tty::make_label(&format!("Digit value={}", d))
             )
             .to_grid()

@@ -19,10 +19,10 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
 
     // todo: proper scoping of Radix variable
     ctx.write().unwrap().add_varname("Radix");
-/*
+
     let morphtype =
             crate::repr_tree::MorphismType {
-                src_type: Context::parse(&ctx, "<Digit Radix>"),
+                src_type: Context::parse(&ctx, "<Digit Radix>~Char"),
                 dst_type: Context::parse(&ctx, "<Digit Radix>~EditTree")
             };
 
@@ -45,6 +45,9 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
                         if let Some(crt) = src_rt.descend(Context::parse(&ctx, "Char")) {
                             crt
                         } else {
+                            /* TODO: replace this with some formal specification
+                             *       of "required representations"
+                             */
                             let crt = ReprTree::from_singleton_buffer(
                                 Context::parse(&ctx, "Char"),
                                 SingletonBuffer::new('\0')
@@ -70,13 +73,13 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
                         .insert_branch(
                             ReprTree::from_singleton_buffer(
                                 Context::parse(&ctx, "EditTree"),
-                                SingletonBuffer::new(edittree)
+                                SingletonBuffer::new(Arc::new(RwLock::new(edittree)))
                             )
                         );
                 }
             }
         );
-*/
+
     let morphtype =
             crate::repr_tree::MorphismType {
                 src_type: Context::parse(&ctx, "<Digit Radix>~Char"),

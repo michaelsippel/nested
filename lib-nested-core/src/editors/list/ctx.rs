@@ -24,49 +24,7 @@ use {
 
 pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
     ctx.write().unwrap().add_varname("Item");
-/*
-    let mt = crate::repr_tree::MorphismType {
-        src_type: Context::parse(&ctx, "<List Char>"),
-        dst_type: Context::parse(&ctx, "<List Char~EditTree>")
-    };
-    ctx.write().unwrap().morphisms.add_morphism(mt, {
-        let ctx = ctx.clone();
-        move |src_rt, σ| {
-            let list_port = src_rt.descend(Context::parse(&ctx, "<List Char>")).expect("descend").get_port::<dyn ListView<char>>().clone();
-            if let Some(list_port) = list_port {
 
-                // for each char, create EditTree
-                let edit_tree_list = 
-                        list_port
-                        .map({
-                            let ctx = ctx.clone();
-                            move |c| {
-                                let item_rt = ReprTree::from_char(&ctx, *c);
-
-                                ctx.read().unwrap().setup_edittree(
-                                    item_rt.clone(),
-                                    SingletonBuffer::new(0).get_port()
-                                );
-
-                                let et = item_rt
-                                    .descend(Context::parse(&ctx, "Char ~ EditTree")).expect("cant descend repr tree")
-                                    .get_port::< dyn SingletonView<Item = EditTree> >().expect("cant get view port (EditTree)")
-                                    .get_view().unwrap()
-                                    .get();
-                                Arc::new(RwLock::new(et))
-                            }
-                        });
-
-                src_rt.attach_leaf_to(
-                    Context::parse(&ctx, "<List Char>~<List EditTree>"),
-                    edit_tree_list
-                );
-            } else {
-                eprintln!("morphism missing view port");
-            }
-        }
-    });
-*/
     let mt = crate::repr_tree::MorphismType {
         src_type: Context::parse(&ctx, "<List Item>~<List EditTree>~<Vec EditTree>"),
         dst_type: Context::parse(&ctx, "<List Item>~EditTree")
@@ -93,6 +51,7 @@ pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
                 src_rt.insert_leaf(
                     Context::parse(&ctx, "<List Item> ~ EditTree")
                         .apply_substitution(&|id| σ.get(id).cloned()).clone(),
+
                     ReprLeaf::from_singleton_buffer(
                         SingletonBuffer::new(Arc::new(RwLock::new(edittree_list)))
                     )
@@ -123,14 +82,15 @@ pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
                 src_rt.insert_leaf(
                     Context::parse(&ctx, "<List Char>"),
                     ReprLeaf::from_view(
-                    edittree_items
+                        edittree_items
                         .map(|edittree_char|
                             edittree_char
                                 .read().unwrap()
                                 .get_edit::<CharEditor>().unwrap()
                                 .read().unwrap()
                                 .get()
-                        ))
+                        )
+                    )
                 );
             }
         }
@@ -148,13 +108,12 @@ pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
         {
             let ctx = ctx.clone();
             move |src_rt, σ| {
+                let list_view = src_rt.view_list::<char>();
+
                 src_rt
                     .attach_leaf_to(
-                        Context::parse(&ctx, "<List Char>~<Vec Char>"),
-                        src_rt
-                            .descend(Context::parse(&ctx, "<List Char>"))
-                            .expect("descend")
-                            .view_list::<char>()
+                        Context::parse(&ctx, "<Vec Char>"),
+                        list_view
                     );
             }
         }

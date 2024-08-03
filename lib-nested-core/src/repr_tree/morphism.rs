@@ -251,7 +251,7 @@ impl MorphismBase {
 
             Some((m, σ))
         } else {
-            eprintln!("could not find item morphism\n");
+//            eprintln!("could not find item morphism\n");
             None
         }
     }

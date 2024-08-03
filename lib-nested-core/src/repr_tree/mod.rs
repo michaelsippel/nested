@@ -345,41 +345,6 @@ impl ReprTree {
         Arc::new(RwLock::new(rt))
     }
 
-    /// find, and if necessary, create corresponding path in repr-tree.
-    /// Attach src_port to input of that node
-    pub fn attach_leaf_to<V>(
-        &mut self,
-        mut type_ladder: impl Iterator<Item = TypeTerm>,
-        src_port: OuterViewPort<V>
-    )
-    where V: View + ?Sized + 'static,
-        V::Msg: Clone
-    {
-        if let Some(rung_type) = type_ladder.next() {
-            if &rung_type == self.get_type() {
-                if let Some(leaf) = self.leaf.as_mut() {
-                    leaf.attach_to(src_port);
-                } else {
-                    self.leaf = Some(ReprLeaf::from_view(src_port));
-                }
-            } else {
-                if let Some(next_repr) = self.branches.get(&rung_type) {
-                    next_repr.write().unwrap().attach_leaf_to(type_ladder, src_port);
-                } else {
-                    let mut next_repr = ReprTree::new(rung_type.clone());
-                    next_repr.attach_leaf_to(type_ladder, src_port);
-                    self.insert_branch(Arc::new(RwLock::new(next_repr)));
-                }
-            }
-        } else {
-            if let Some(leaf) = self.leaf.as_mut() {
-                leaf.attach_to(src_port);
-            } else {
-                self.leaf = Some(ReprLeaf::from_view(src_port));
-            }
-        }
-    }
-
     pub fn attach_to<V>(
         &mut self,
         src_port: OuterViewPort<V>
@@ -391,6 +356,36 @@ impl ReprTree {
             leaf.attach_to(src_port);
         } else {
             eprintln!("cant attach branch without leaf");
+        }
+    }
+
+    /// find, and if necessary, create corresponding path in repr-tree.
+    /// Attach src_port to input of that node
+    pub fn attach_leaf_to<V>(
+        &mut self,
+        mut type_ladder: impl Iterator<Item = TypeTerm>,
+        src_port: OuterViewPort<V>
+    )
+    where V: View + ?Sized + 'static,
+        V::Msg: Clone
+    {
+        while let Some(rung_type) = type_ladder.next() {
+            if &rung_type != self.get_type() {
+                if let Some(next_repr) = self.branches.get(&rung_type) {
+                    next_repr.write().unwrap().attach_leaf_to(type_ladder, src_port);
+                } else {
+                    let mut next_repr = ReprTree::new(rung_type.clone());
+                    next_repr.attach_leaf_to(type_ladder, src_port);
+                    self.insert_branch(Arc::new(RwLock::new(next_repr)));
+                }
+                return;
+            }
+        }
+        
+        if let Some(leaf) = self.leaf.as_mut() {
+            leaf.attach_to(src_port);
+        } else {
+            self.leaf = Some(ReprLeaf::from_view(src_port));
         }
     }
 
@@ -417,17 +412,20 @@ impl ReprTree {
         mut type_ladder: impl Iterator<Item = TypeTerm>,
         leaf: ReprLeaf
     ) {
-        if let Some(type_term) = type_ladder.next() {
-            if let Some(next_repr) = self.branches.get(&type_term) {
-                next_repr.write().unwrap().insert_leaf(type_ladder, leaf);
-            } else {
-                let mut next_repr = ReprTree::new(type_term.clone());
-                next_repr.insert_leaf(type_ladder, leaf);
-                self.insert_branch(Arc::new(RwLock::new(next_repr)));
+        while let Some(type_term) = type_ladder.next() {
+            if &type_term != self.get_type() {
+                if let Some(next_repr) = self.branches.get(&type_term) {
+                    next_repr.write().unwrap().insert_leaf(type_ladder, leaf.clone());
+                } else {
+                    let mut next_repr = ReprTree::new(type_term.clone());
+                    next_repr.insert_leaf(type_ladder, leaf.clone());
+                    self.insert_branch(Arc::new(RwLock::new(next_repr)));
+                }
+                return;
             }
-        } else {
-            self.leaf = Some(leaf)
         }
+
+        self.leaf = Some(leaf);
     }
 
     //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
