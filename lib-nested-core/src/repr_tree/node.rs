@@ -187,7 +187,21 @@ impl ReprTree {
         if let Some(leaf) = self.leaf.as_mut() {
             leaf.attach_to(src_port);
         } else {
-            self.leaf = Some(ReprLeaf::from_view(src_port));
+            if self.type_tag == TypeTerm::App(vec![
+                TypeTerm::TypeID(TypeID::Fun(11)),
+                TypeTerm::TypeID(TypeID::Fun(2))
+            ]) {
+                let mut leaf = ReprLeaf::from_vec_buffer(
+                    VecBuffer::<
+                        Arc<RwLock<crate::edit_tree::EditTree>>
+                    >::new()
+                );
+
+                leaf.attach_to(src_port);
+                self.leaf = Some(leaf);
+            } else {
+                self.leaf = Some(ReprLeaf::from_view(src_port));
+            }
         }
     }
 
