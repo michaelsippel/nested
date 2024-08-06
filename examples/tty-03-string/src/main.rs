@@ -43,19 +43,23 @@ async fn main() {
 
     /* Create a Representation-Tree of type <List Char>
      */
-    let mut rt_string = ReprTree::new_arc( Context::parse(&ctx, "<List Char>") );
-
-    rt_string.insert_leaf(
-        Context::parse(&ctx, "<List~Vec EditTree>"),
-        nested::repr_tree::ReprLeaf::from_vec_buffer( VecBuffer::<Arc<RwLock<EditTree>>>::new() )
+    let mut rt_string = ReprTree::from_str(
+        Context::parse(&ctx, "<List Char>~<Vec Char>"),
+        "hello world"
     );
+
+    /* create EditTree
+     */
     ctx.read().unwrap().apply_morphism(
         &rt_string,
         &laddertypes::MorphismType {
-            src_type: Context::parse(&ctx, "<List Char~EditTree>~<Vec EditTree>"),
+            src_type: Context::parse(&ctx, "<List~Vec Char>"),
             dst_type: Context::parse(&ctx, "<List Char> ~ EditTree")
         }
     );
+
+    // .. avoid cycle of projections..
+    rt_string.write().unwrap().detach(&ctx);
 
     /* Setup the Editor-View for this ReprTree
      */
@@ -65,7 +69,7 @@ async fn main() {
             SingletonBuffer::new(0).get_port()
         ).unwrap();
 
-    /* In order to get acces to the values that are modified by the Editor,
+    /* In order to get access to the values that are modified by the Editor,
      * we apply a morphism that, given the List of Edit-Trees, extracts
      * the value from each EditTree and shows them in a ListView.
      */

@@ -139,6 +139,27 @@ impl ReprTree {
         Arc::new(RwLock::new(rt))
     }
 
+
+    pub fn from_str(
+        type_tag: impl Into<TypeTerm>,
+        val: &str
+    ) -> Arc<RwLock<Self>> {
+        let mut lnf = type_tag.into().get_lnf_vec();
+
+        let mut rt = ReprTree::from_vec_buffer(
+            lnf.pop().unwrap(),
+            VecBuffer::with_data( val.chars().collect() )
+        );
+
+        while let Some(t) = lnf.pop() {
+            let mut new_rt = ReprTree::new_arc(t);
+            new_rt.insert_branch(rt);
+            rt = new_rt;
+        }
+
+        rt
+    }
+
     pub fn from_vec_buffer<T>( type_tag: impl Into<TypeTerm>, buf: VecBuffer<T> ) -> Arc<RwLock<Self>>
     where T: Clone + Send + Sync + 'static
     {

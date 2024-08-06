@@ -66,16 +66,22 @@ async fn main() {
     nested_tty::setup_edittree_hook(&ctx);
 
     /* Create a Representation-Tree of type `ℕ`
+     * with a specific representation-path (big-endian hexadecimal string)
      */
-    let mut rt_int = ReprTree::new_arc( Context::parse(&ctx, "ℕ") );
+    let mut rt_int = nested::repr_tree::ReprTree::from_str(
+        /* TYPE */
+        Context::parse(&ctx, "
+              ℕ
+            ~ <PosInt 16 BigEndian>
+            ~ <Seq <Digit 16>>
+            ~ <List <Digit 16>>
+            ~ <List Char>
+            ~ <Vec Char>
+        "),
 
-    /* Add a specific Representation-Path (big-endian hexadecimal)
-     */
-    rt_int.insert_leaf(
-        Context::parse(&ctx, "<PosInt 16 BigEndian>~<Seq <Digit 16>>~<List <Digit 16>>~<List Char>~<Vec Char>"),
-        nested::repr_tree::ReprLeaf::from_vec_buffer(
-            VecBuffer::with_data(vec![ 'c', 'f', 'f' ]
-        )));
+        /* VALUE */
+        "cff"
+    );
 
     /* initially copy values from Vec to EditTree...
      */

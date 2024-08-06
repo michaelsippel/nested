@@ -91,7 +91,7 @@ impl Context {
                             src_type: src_type.clone(),
                             dst_type: dst_type.clone()
                         }
-                    ) {                   
+                    ) {
                         let mut rt = rt.descend( τ ).expect("descend src repr");
                         (m.setup_projection)( &mut rt, &σ );
                     }
