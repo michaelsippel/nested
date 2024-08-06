@@ -10,7 +10,7 @@ pub use {
     context::{Context},
     leaf::ReprLeaf,
     node::ReprTree,
-    morphism::{MorphismType, GenericReprTreeMorphism, MorphismBase}
+    morphism::{GenericReprTreeMorphism}
 };
 
 use {

@@ -3,9 +3,9 @@ use {
     r3vi::{
         view::{OuterViewPort, singleton::*, list::*}
     },
-    laddertypes::{TypeTerm},
+    laddertypes::{TypeTerm, MorphismType},
     crate::{
-        repr_tree::{ReprTree, ReprTreeExt, ReprLeaf, Context, MorphismType},
+        repr_tree::{ReprTree, ReprTreeExt, ReprLeaf, Context, GenericReprTreeMorphism},
         editors::{
             list::*,
             integer::*
@@ -20,312 +20,93 @@ pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
     ctx.write().unwrap().add_varname("DstRadix");
 
 
-    /*
-     *    MACHINE INT,  SEQ
-     */
-    let morphism_type =
-        MorphismType {
-            src_type: Context::parse(&ctx, "
-                  ℕ
-                ~ <PosInt Radix BigEndian>
-                ~ <Seq   <Digit Radix>
-                       ~ ℤ_2^64
-                       ~ machine.UInt64 >"),
-            dst_type: Context::parse(&ctx, "
-                  ℕ
-                ~ <PosInt Radix LittleEndian>
-                ~ <Seq   <Digit Radix>
-                       ~ ℤ_2^64
-                       ~ machine.UInt64 >")
-        };
-    ctx.write().unwrap().morphisms.add_morphism(
-        morphism_type, {
+    let posint_seq_morph_big_to_little = GenericReprTreeMorphism::new(
+        Context::parse(&ctx, "ℕ ~ <PosInt Radix BigEndian>
+                ~ <Seq <Digit Radix> ~ ℤ_2^64 ~ machine.UInt64 >"),
+        Context::parse(&ctx, "ℕ ~ <PosInt Radix LittleEndian>
+                ~ <Seq <Digit Radix> ~ ℤ_2^64 ~ machine.UInt64 >"),
+        {
             let ctx = ctx.clone();
             move |src_rt, σ| {
-                let src_digits = src_rt.descend(
-                    Context::parse(&ctx, "
+                let src_digits = src_rt
+                    .descend(Context::parse(&ctx, "
                           <PosInt Radix BigEndian>
-                        ~ <Seq   <Digit Radix>
-                               ~ ℤ_2^64
-                               ~ machine.UInt64 >
-                    ")
+                        ~ <Seq <Digit Radix> ~ ℤ_2^64 ~ machine.UInt64 >
+                        ")
                         .apply_substitution(&|k|σ.get(k).cloned())
                         .clone()
-                ).expect("cant descend")
-                   .view_seq::< u64 >();
+                    ).expect("cant descend")
+                       .view_seq::< u64 >();
 
                 src_rt.attach_leaf_to(Context::parse(&ctx, "
                           <PosInt Radix LittleEndian>
-                        ~ <Seq <Digit Radix>
-                               ~ ℤ_2^64
-                               ~ machine.UInt64 >
+                        ~ <Seq <Digit Radix> ~ ℤ_2^64 ~ machine.UInt64 >
                     ").apply_substitution(&|k|σ.get(k).cloned()).clone(),
                     src_digits.reverse()
-                );
+                );            
             }
         }
     );
 
-    /*    MACHINE INT,   LIST
-     */
-    let morphism_type = MorphismType {
-        src_type: Context::parse(&ctx, "
-              ℕ
-            ~ <PosInt Radix BigEndian>
-            ~ <Seq <Digit Radix>>
-            ~ <List <Digit Radix>>
-            ~ <List ℤ_2^64>
-            ~ <List machine.UInt64>
-        "),
-        dst_type: Context::parse(&ctx, "
-              ℕ 
-            ~ <PosInt Radix LittleEndian>
-            ~ <Seq <Digit Radix>>
-            ~ <List <Digit Radix>>
-            ~ <List ℤ_2^64>
-            ~ <List machine.UInt64>
-        ")
-    };
-
-    ctx.write().unwrap().morphisms.add_morphism(
-        morphism_type,
+    let posint_list_morph_big_to_little = GenericReprTreeMorphism::new(
+        Context::parse(&ctx, "ℕ ~ <PosInt Radix BigEndian>
+                ~ <Seq~List <Digit Radix> ~ ℤ_2^64 ~ machine.UInt64 >"),
+        Context::parse(&ctx, "ℕ ~ <PosInt Radix LittleEndian>
+                ~ <Seq~List <Digit Radix> ~ ℤ_2^64 ~ machine.UInt64 >"),
         {
             let ctx = ctx.clone();
             move |src_rt, σ| {
-                let src_digits = src_rt.descend(Context::parse(&ctx, "
-                              <PosInt Radix BigEndian>
-                            ~ <Seq <Digit Radix>>
-                            ~ <List <Digit Radix> ~ ℤ_2^64 ~ machine.UInt64 >
+                let src_digits = src_rt
+                    .descend(Context::parse(&ctx, "
+                          <PosInt Radix BigEndian>
+                        ~ <Seq~List <Digit Radix> ~ ℤ_2^64 ~ machine.UInt64 >
                         ")
-                    .apply_substitution(&|k|σ.get(k).cloned()).clone()
-                ).expect("cant descend")
-                .get_port::< dyn ListView<u64> >().unwrap();
+                        .apply_substitution(&|k|σ.get(k).cloned())
+                        .clone()
+                    ).expect("cant descend")
+                       .view_list::< u64 >();
 
-                src_rt.attach_leaf_to(
-                    Context::parse(&ctx, "
-                              <PosInt Radix LittleEndian>
-                            ~ <Seq <Digit Radix>>
-                            ~ <List <Digit Radix> ~ ℤ_2^64 ~ machine.UInt64>
-                    ").apply_substitution(&|k| σ.get(k).cloned()).clone(),
+                src_rt.attach_leaf_to(Context::parse(&ctx, "
+                          <PosInt Radix LittleEndian>
+                        ~ <Seq~List <Digit Radix> ~ ℤ_2^64 ~ machine.UInt64 >
+                    ").apply_substitution(&|k|σ.get(k).cloned()).clone(),
                     src_digits.reverse()
-                );
+                );            
             }
         }
     );
 
-
-    let mt = MorphismType {
-        src_type: Context::parse(&ctx, "
-            ℕ
-            ~ <PosInt Radix BigEndian>
-            ~ <Seq <Digit Radix>>
-            ~ <List <Digit Radix>>
-            ~ <List Char>
-        "),
-        dst_type: Context::parse(&ctx, "
-            ℕ
-            ~ <PosInt Radix LittleEndian>
-            ~ <Seq <Digit Radix>>
-            ~ <List <Digit Radix>>
-            ~ <List Char>
-        ")
-    };
-    ctx.write().unwrap().morphisms.add_morphism(
-        mt,
+    let posint_list_morph_little_to_big = GenericReprTreeMorphism::new(
+        Context::parse(&ctx, "ℕ ~ <PosInt Radix LittleEndian>
+                ~ <Seq~List <Digit Radix> ~ ℤ_2^64 ~ machine.UInt64 >"),
+        Context::parse(&ctx, "ℕ ~ <PosInt Radix BigEndian>
+                ~ <Seq~List <Digit Radix> ~ ℤ_2^64 ~ machine.UInt64 >"),
         {
             let ctx = ctx.clone();
             move |src_rt, σ| {
-                let radix = σ.get( &laddertypes::TypeID::Var(ctx.read().unwrap().get_var_typeid("Radix").unwrap()) );
-                let src_digits = src_rt.descend(Context::parse(&ctx, "
-                     <PosInt Radix BigEndian>
-                     ~ <Seq <Digit Radix>>
-                     ~ <List <Digit Radix>~Char >
-                    ").apply_substitution(&|k|σ.get(k).cloned()).clone()
-                ).expect("cant descend")
-                    .get_port::< dyn ListView<char> >().unwrap();
-
-                let rev_port = src_digits.reverse();
-                src_rt.attach_leaf_to(
-                    Context::parse(&ctx, "
-                            < PosInt Radix LittleEndian >
-                            ~ < Seq <Digit Radix> >
-                            ~ < List <Digit Radix>~Char >
-                    ").apply_substitution(&|k| σ.get(k).cloned()).clone(),
-                    rev_port
-                );
-            }
-        }
-    );
-
-
-
-
-
-
-    let morphism_type = MorphismType {
-        src_type: Context::parse(&ctx, "ℕ ~ <PosInt Radix LittleEndian> ~ <Seq <Digit Radix>~ℤ_2^64~machine.UInt64>"),
-        dst_type: Context::parse(&ctx, "ℕ ~ <PosInt Radix BigEndian> ~ <Seq <Digit Radix>~ℤ_2^64~machine.UInt64>")
-    };
-
-    ctx.write().unwrap().morphisms.add_morphism(
-        morphism_type,
-        {
-            let ctx = ctx.clone();
-            move |src_rt, σ| {
-                let src_digits = ReprTree::descend(
-                    &src_rt,
-                    Context::parse(&ctx, "
-                            <PosInt Radix LittleEndian>
-                            ~<Seq <Digit Radix>~ℤ_2^64~machine.UInt64 >
+                let src_digits = src_rt
+                    .descend(Context::parse(&ctx, "
+                          <PosInt Radix LittleEndian>
+                        ~ <Seq~List <Digit Radix> ~ ℤ_2^64 ~ machine.UInt64 >
                         ")
-                    .apply_substitution(&|k|σ.get(k).cloned()).clone()
-                ).expect("cant descend")
-                 .view_seq::< u64 >();
+                        .apply_substitution(&|k|σ.get(k).cloned())
+                        .clone()
+                    ).expect("cant descend")
+                       .view_list::< u64 >();
 
                 src_rt.attach_leaf_to(Context::parse(&ctx, "
                           <PosInt Radix BigEndian>
-                        ~ <Seq <Digit Radix> ~ ℤ_2^64 ~ machine.UInt64>
-                    ").apply_substitution(&|k|σ.get(k).cloned()).clone(),                        
-                    src_digits.reverse()
-                );
-            }
-        }
-    );
-
-    let morphism_type =
-        MorphismType {
-            src_type: Context::parse(&ctx, "
-                  ℕ
-                ~ <PosInt Radix LittleEndian>
-                ~ <Seq <Digit Radix>>
-                ~ <List <Digit Radix>>
-                ~ <List ℤ_2^64>
-                ~ <List machine.UInt64>
-            "),
-            dst_type: Context::parse(&ctx, "
-                  ℕ
-                ~ <PosInt Radix BigEndian>
-                ~ <Seq <Digit Radix>>
-                ~ <List <Digit Radix>>
-                ~ <List ℤ_2^64>
-                ~ <List machine.UInt64>
-            ")
-        };
-    ctx.write().unwrap().morphisms.add_morphism(
-        morphism_type, {
-            let ctx = ctx.clone();
-            move |src_rt, σ|
-            {
-                let src_digits = src_rt.descend(
-                        Context::parse(&ctx, "
-                              <PosInt Radix LittleEndian>
-                            ~ <Seq <Digit Radix>>
-                            ~ <List <Digit Radix>~ℤ_2^64~machine.UInt64 >
-                        ").apply_substitution(&|k|σ.get(k).cloned()).clone()
-                    )
-                    .expect("cant descend")
-                    .view_list::<u64>();
-
-                src_rt.attach_leaf_to(
-                    Context::parse(&ctx, "
-                              <PosInt Radix BigEndian>
-                            ~ <Seq <Digit Radix>>
-                            ~ <List <Digit Radix>~ℤ_2^64~machine.UInt64 >
+                        ~ <Seq~List <Digit Radix> ~ ℤ_2^64 ~ machine.UInt64 >
                     ").apply_substitution(&|k|σ.get(k).cloned()).clone(),
                     src_digits.reverse()
-                );
+                );            
             }
         }
     );
 
 
-    let mt = MorphismType {
-        src_type: Context::parse(&ctx, "
-              ℕ 
-            ~ <PosInt Radix LittleEndian>
-            ~ <Seq <Digit Radix>>
-            ~ <List <Digit Radix>>
-            ~ <List Char>
-        "),
-        dst_type: Context::parse(&ctx, "
-              ℕ
-            ~ <PosInt Radix BigEndian>
-            ~ <Seq <Digit Radix>>
-            ~ <List <Digit Radix>>
-            ~ <List Char>
-        ")
-    };
-
-    ctx.write().unwrap().morphisms.add_morphism(
-        mt,
-        {
-            let ctx = ctx.clone();
-            move |src_rt, σ| {
-                let src_digits = src_rt.descend(Context::parse(&ctx, "
-                       <PosInt Radix LittleEndian>
-                     ~ <Seq <Digit Radix>>
-                     ~ <List <Digit Radix>~Char >
-                    ").apply_substitution(&|k|σ.get(k).cloned()).clone()
-                ).expect("cant descend")
-                    .view_list::<char>();
-
-                src_rt.attach_leaf_to(
-                    Context::parse(&ctx, "
-                              < PosInt Radix BigEndian >
-                            ~ < Seq <Digit Radix> >
-                            ~ < List <Digit Radix>~Char >
-                    ").apply_substitution(&|k| σ.get(k).cloned()).clone(),
-                    src_digits.reverse()
-                );
-            }
-        }
-    );
-/*
-    let mt = MorphismType {
-        src_type: Context::parse(&ctx, "
-              ℕ 
-            ~ <PosInt Radix BigEndian>
-            ~ <Seq <Digit Radix>>
-            ~ <List <Digit Radix>>
-            ~ <List Char>
-        "),
-        dst_type: Context::parse(&ctx, "
-              ℕ
-            ~ <PosInt Radix LittleEndian>
-            ~ <Seq <Digit Radix>>
-            ~ <List <Digit Radix>>
-            ~ <List Char>
-        ")
-    };
-
-    ctx.write().unwrap().morphisms.add_morphism(
-        mt,
-        {
-            let ctx = ctx.clone();
-            move |src_rt, σ| {    
-                let src_digits = src_rt.descend(Context::parse(&ctx, "
-                       <PosInt Radix BigEndian>
-                     ~ <Seq <Digit Radix>>
-                     ~ <List <Digit Radix>~Char >
-                    ").apply_substitution(&|k|σ.get(k).cloned()).clone()
-                ).expect("cant descend")
-                    .view_list::<char>();
-
-                src_rt.attach_leaf_to(
-                    Context::parse(&ctx, "
-                              < PosInt Radix LittleEndian >
-                            ~ < Seq <Digit Radix> >
-                            ~ < List <Digit Radix>~Char >
-                    ").apply_substitution(&|k| σ.get(k).cloned()).clone(),
-                    src_digits.reverse()
-                );
-            }
-        }
-    );
-*/
-
-    let morphism_type = MorphismType {
-        src_type: Context::parse(&ctx, "
+    let posint_list_morph_radix = GenericReprTreeMorphism::new(
+        Context::parse(&ctx, "
               ℕ
             ~ <PosInt SrcRadix LittleEndian>
             ~ <Seq   <Digit SrcRadix>>
@@ -333,18 +114,14 @@ pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
                    ~ ℤ_2^64
                    ~ machine.UInt64>
         "),
-        dst_type: Context::parse(&ctx, "
+        Context::parse(&ctx, "
               ℕ
             ~ <PosInt DstRadix LittleEndian>
             ~ <Seq   <Digit DstRadix>>
             ~ <List  <Digit DstRadix>
                    ~ ℤ_2^64
                    ~ machine.UInt64>
-        ")
-    };
-
-    ctx.write().unwrap().morphisms.add_morphism(
-        morphism_type,
+        "),
         {
             let ctx = ctx.clone();
             move |src_rt, σ| {
@@ -389,7 +166,13 @@ pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
                     dst_digits_port
                 );
             }
+            
         }
     );
+
+    ctx.write().unwrap().morphisms.add_morphism( posint_seq_morph_big_to_little );
+    ctx.write().unwrap().morphisms.add_morphism( posint_list_morph_big_to_little );
+    ctx.write().unwrap().morphisms.add_morphism( posint_list_morph_little_to_big );    
+    ctx.write().unwrap().morphisms.add_morphism( posint_list_morph_radix );
 }
 

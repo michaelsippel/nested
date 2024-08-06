@@ -83,10 +83,12 @@ fn digit_projection_char_to_u64() {
     //<><><><>
     // add another representation
  
-    ctx.read().unwrap().morphisms.apply_morphism(
+    ctx.read().unwrap().apply_morphism(
         rt_digit.clone(),
-        &Context::parse(&ctx, "<Digit 16>~Char"),
-        &Context::parse(&ctx, "<Digit 16>~ℤ_2^64~machine.UInt64")
+        &laddertypes::MorphismType {
+            src_type: Context::parse(&ctx, "<Digit 16>~Char"),
+            dst_type: Context::parse(&ctx, "<Digit 16>~ℤ_2^64~machine.UInt64")
+        }
     );
 
     let digit_u64_view = rt_digit
@@ -121,10 +123,12 @@ fn digit_projection_u64_to_char() {
     //<><><><>
     // add another representation
  
-    ctx.read().unwrap().morphisms.apply_morphism(
+    ctx.read().unwrap().apply_morphism(
         rt_digit.clone(),
-        &Context::parse(&ctx, "<Digit 16>~ℤ_2^64~machine.UInt64"),
-        &Context::parse(&ctx, "<Digit 16>~Char")
+        &laddertypes::MorphismType {
+            src_type: Context::parse(&ctx, "<Digit 16>~ℤ_2^64~machine.UInt64"),
+            dst_type: Context::parse(&ctx, "<Digit 16>~Char")
+        }
     );
 
     let digit_u64_view = rt_digit
@@ -170,10 +174,12 @@ fn char_buffered_projection() {
     assert_eq!( digit_char_view.get_view().unwrap().get(), '5' );
 
     // now we attach the char-repr to the u64-repr
-    ctx.read().unwrap().morphisms.apply_morphism(
+    ctx.read().unwrap().apply_morphism(
         rt_digit.clone(),
-        &Context::parse(&ctx, "<Digit 16>~ℤ_2^64~machine.UInt64"),
-        &Context::parse(&ctx, "<Digit 16>~Char")
+        &laddertypes::MorphismType {
+            src_type: Context::parse(&ctx, "<Digit 16>~ℤ_2^64~machine.UInt64"),
+            dst_type: Context::parse(&ctx, "<Digit 16>~Char")
+        }
     );
 
     // char buffer and view should now follow the u64-buffer

@@ -1,8 +1,8 @@
 use {
     r3vi::{view::{OuterViewPort, singleton::*}, buffer::{singleton::*}},
-    laddertypes::{TypeDict, TypeTerm, TypeID},
+    laddertypes::{TypeDict, TypeTerm, TypeID, MorphismType, MorphismBase, Morphism},
     crate::{
-        repr_tree::{ReprTree, ReprTreeExt, MorphismType, GenericReprTreeMorphism, MorphismBase},
+        repr_tree::{ReprTree, ReprTreeExt, GenericReprTreeMorphism},
         edit_tree::EditTree
     },
     std::{
@@ -18,7 +18,7 @@ pub struct Context {
     /// assigns a name to every type
     pub type_dict: Arc<RwLock<TypeDict>>,
 
-    pub morphisms: MorphismBase,
+    pub morphisms: laddertypes::morphism::MorphismBase< GenericReprTreeMorphism >,
 
     /// named vertices of the graph
     nodes: HashMap< String, Arc<RwLock<ReprTree>> >,
@@ -39,12 +39,15 @@ impl Context {
     pub fn with_parent(
         parent: Option<Arc<RwLock<Context>>>
     ) -> Self {
+        let mut dict = TypeDict::new();
+        let list_typeid = dict.add_typename("List".into());
+
         Context {
             type_dict: match parent.as_ref() {
                 Some(p) => p.read().unwrap().type_dict.clone(),
-                None => Arc::new(RwLock::new(TypeDict::new()))
+                None => Arc::new(RwLock::new(dict))
             },
-            morphisms: MorphismBase::new(),
+            morphisms: MorphismBase::new( list_typeid ),
             nodes: HashMap::new(),
             list_types: match parent.as_ref() {
                 Some(p) => p.read().unwrap().list_types.clone(),
@@ -75,9 +78,35 @@ impl Context {
         }
     }
 
+    pub fn apply_morphism( &self, rt: &Arc<RwLock<ReprTree>>, ty: &MorphismType ) {
+        if let Some(path)
+            = self.morphisms.find_morphism_path( ty.clone().normalize() )
+        {
+            let mut path = path.into_iter();
+            if let Some(mut src_type) = path.next() {
+                for dst_type in path {
+                   if let Some(( m, mut τ, σ )) =
+                       self.morphisms.find_morphism_with_subtyping(
+                        &laddertypes::MorphismType {
+                            src_type: src_type.clone(),
+                            dst_type: dst_type.clone()
+                        }
+                    ) {                   
+                        let mut rt = rt.descend( τ ).expect("descend src repr");
+                        (m.setup_projection)( &mut rt, &σ );
+                    }
+
+                    src_type = dst_type;
+                }
+            }
+        } else {
+            eprintln!("no path found");
+        }    
+    }
+
     pub fn make_repr(ctx: &Arc<RwLock<Self>>, t: &TypeTerm) -> Arc<RwLock<ReprTree>> {
         let rt = Arc::new(RwLock::new(ReprTree::new( TypeTerm::unit() )));
-        ctx.read().unwrap().morphisms.apply_morphism( rt.clone(), &TypeTerm::unit(), t );
+        ctx.read().unwrap().apply_morphism( &rt, &MorphismType{ src_type: TypeTerm::unit(), dst_type: t.clone() } );
         rt
     }
 

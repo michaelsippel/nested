@@ -32,131 +32,25 @@ use {
     std::sync::{Arc, RwLock},
 };
 
-fn rebuild_projections(
-    ctx: Arc<RwLock<Context>>,
-    repr_tree: Arc<RwLock<ReprTree>>,
-    morph_types: Vec< (laddertypes::TypeTerm, laddertypes::TypeTerm) >
-) {
-    repr_tree.write().unwrap().detach(&ctx);
-    for (src_type, dst_type) in morph_types.iter() {
-        ctx.read().unwrap().morphisms.apply_morphism(
-            repr_tree.clone(),
-            &src_type,
-            &dst_type
-        );
-    }
-}
-
-fn setup_hex_master(ctx: &Arc<RwLock<Context>>, rt_int: &Arc<RwLock<ReprTree>>) {   
-    rebuild_projections(
-        ctx.clone(),
-        rt_int.clone(),
-        vec![
-            // extract values from hex-editor
-            (
-             "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char> ~ EditTree",
-             "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char>"
-            ),
-
-            // convert to little-endian
-            (
-             "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char>",
-             "ℕ ~ <PosInt 16 LittleEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char>"
-            ),
-            // convert digit representation from char to u64
-            (
-             "ℕ ~ <PosInt 16 LittleEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char>",
-             "ℕ ~ <PosInt 16 LittleEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ ℤ_2^64 ~ machine.UInt64>"
-            ),
-            // convert radix to decimal
-            (
-             "ℕ ~ <PosInt 16 LittleEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ ℤ_2^64 ~ machine.UInt64>",
-             "ℕ ~ <PosInt 10 LittleEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ ℤ_2^64 ~ machine.UInt64>"
-            ), 
-            // convert decimal digit representation back to char
-            (
-             "ℕ ~ <PosInt 10 LittleEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ ℤ_2^64 ~ machine.UInt64>",
-             "ℕ ~ <PosInt 10 LittleEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ Char>"
-            ),
-            // convert to big-endian
-            (
-             "ℕ ~ <PosInt 10 LittleEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ Char>",
-             "ℕ ~ <PosInt 10 BigEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ Char>"
-            ),
-
-            // decimal editor
-            (
-             "ℕ ~ <PosInt 10 BigEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ Char>",
-             "ℕ ~ <PosInt 10 BigEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ Char ~ EditTree>"
-            ),
-            (
-             "ℕ ~ <PosInt 10 BigEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ Char ~ EditTree>",
-             "ℕ ~ <PosInt 10 BigEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ Char ~ EditTree> ~ <Vec EditTree>"
-            ),
-            (
-             "ℕ ~ <PosInt 10 BigEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ Char ~ EditTree> ~ <Vec EditTree>",
-             "ℕ ~ <PosInt 10 BigEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ Char> ~ EditTree"
-            ),
-
-        ].into_iter()
-            .map(|(s,d)| (Context::parse(&ctx, s), Context::parse(&ctx, d)))
-            .collect()
+fn setup_hex_master(ctx: &Arc<RwLock<Context>>, rt_int: &Arc<RwLock<ReprTree>>) {
+    rt_int.write().unwrap().detach( ctx );
+    ctx.read().unwrap().apply_morphism(
+        rt_int,
+        &laddertypes::MorphismType {
+            src_type: Context::parse(&ctx, "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char> ~ EditTree"),
+            dst_type: Context::parse(&ctx, "ℕ ~ <PosInt 10 BigEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ Char> ~ EditTree")
+        }
     );
 }
 
 fn setup_dec_master(ctx: &Arc<RwLock<Context>>, rt_int: &Arc<RwLock<ReprTree>>) {
-    rebuild_projections(
-        ctx.clone(),
-        rt_int.clone(),
-        vec![
-            // extract values from decimal-editor
-            (
-             "ℕ ~ <PosInt 10 BigEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ Char> ~ EditTree",
-             "ℕ ~ <PosInt 10 BigEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ Char>"
-            ),
-
-            // convert to little-endian
-            (
-             "ℕ ~ <PosInt 10 BigEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ Char>",
-             "ℕ ~ <PosInt 10 LittleEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ Char>"
-            ),
-            // convert digit representation to u64
-            (
-             "ℕ ~ <PosInt 10 LittleEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ Char>",
-             "ℕ ~ <PosInt 10 LittleEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ ℤ_2^64 ~ machine.UInt64>"
-            ),
-            // convert radix to decimal
-            (
-             "ℕ ~ <PosInt 10 LittleEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ ℤ_2^64 ~ machine.UInt64>",
-             "ℕ ~ <PosInt 16 LittleEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ ℤ_2^64 ~ machine.UInt64>"
-            ), 
-            // convert back digit representation char
-            (
-             "ℕ ~ <PosInt 16 LittleEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ ℤ_2^64 ~ machine.UInt64>",
-             "ℕ ~ <PosInt 16 LittleEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char>"
-            ),
-            // convert back to big-endian
-            (
-             "ℕ ~ <PosInt 16 LittleEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char>",
-             "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char>"
-            ),
-
-            // hex editor
-            (
-             "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char>",
-             "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char ~ EditTree>"
-            ),
-            (
-             "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char ~ EditTree>",
-             "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char ~ EditTree> ~ <Vec EditTree>"
-            ),
-            (
-             "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char ~ EditTree> ~ <Vec EditTree>",
-             "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char> ~ EditTree"
-            ),
-         ].into_iter()
-            .map(|(s,d)| (Context::parse(&ctx, s), Context::parse(&ctx, d)))
-            .collect()
+    rt_int.write().unwrap().detach( ctx );
+    ctx.read().unwrap().apply_morphism(
+        rt_int,
+        &laddertypes::MorphismType {
+            src_type: Context::parse(&ctx, "ℕ ~ <PosInt 10 BigEndian> ~ <Seq <Digit 10>> ~ <List <Digit 10> ~ Char> ~ EditTree"),
+            dst_type: Context::parse(&ctx, "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char> ~ EditTree")
+        }
     );
 }
 
@@ -177,71 +71,20 @@ async fn main() {
 
     /* Add a specific Representation-Path (big-endian hexadecimal)
      */
-    let mut digits_hex = VecBuffer::with_data(vec![ 'c', 'f', 'f' ]);
     rt_int.insert_leaf(
         Context::parse(&ctx, "<PosInt 16 BigEndian>~<Seq <Digit 16>>~<List <Digit 16>>~<List Char>~<Vec Char>"),
-        nested::repr_tree::ReprLeaf::from_vec_buffer( digits_hex.clone() )
-    );
-
-    let mut digits_dec = VecBuffer::with_data(vec!['3', '2', '1']);
-    rt_int.insert_leaf(
-        Context::parse(&ctx, "<PosInt 10 BigEndian>~<Seq <Digit 10>>~<List <Digit 10>>~<List Char>~<Vec Char>"),
-        nested::repr_tree::ReprLeaf::from_vec_buffer( digits_dec.clone() )
-    );
-
-    let mut digits_hex_editvec = VecBuffer::<Arc<RwLock<EditTree>>>::new();
-    rt_int.insert_leaf(
-        Context::parse(&ctx, "
-              <PosInt 16 BigEndian>
-            ~ <Seq <Digit 16>>
-            ~ <List   <Digit 16>
-                    ~ Char
-                    ~ EditTree>
-            ~ <Vec EditTree>
-        "),
-        nested::repr_tree::ReprLeaf::from_vec_buffer( digits_hex_editvec.clone() )
-    );
-
-    let mut digits_dec_editvec = VecBuffer::<Arc<RwLock<EditTree>>>::new();
-    rt_int.insert_leaf(
-        Context::parse(&ctx, "
-              <PosInt 10 BigEndian>
-            ~ <Seq <Digit 10>>
-            ~ <List   <Digit 10>
-                    ~ Char
-                    ~ EditTree>
-            ~ <Vec EditTree>
-        "),
-        nested::repr_tree::ReprLeaf::from_vec_buffer( digits_dec_editvec.clone() )
-    );
+        nested::repr_tree::ReprLeaf::from_vec_buffer(
+            VecBuffer::with_data(vec![ 'c', 'f', 'f' ]
+        )));
 
     /* initially copy values from Vec to EditTree...
      */
-    rebuild_projections(
-        ctx.clone(),
-        rt_int.clone(),
-        // master representation
-        vec![
-            (
-             "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char> ~ <Vec Char>",
-             "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char>"
-            ),
-            (
-             "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char>",
-             "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char ~ EditTree>"
-            ),
-            (
-             "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char> ~ <List EditTree>",
-             "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char> ~ <List EditTree> ~ <Vec EditTree>"
-            ),
-            (
-             "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char> ~ <List EditTree> ~ <Vec EditTree>",
-             "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char> ~ EditTree"
-            ),
-          ].into_iter()
-            .map(|(s,d)| (Context::parse(&ctx, s), Context::parse(&ctx, d)))
-            .collect()
-    );
+    ctx.read().unwrap().apply_morphism(
+        &rt_int,
+        &nested::repr_tree::morphism::MorphismType {
+            src_type: Context::parse(&ctx, "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char> ~ <Vec Char>"),
+            dst_type: Context::parse(&ctx, "ℕ ~ <PosInt 16 BigEndian> ~ <Seq <Digit 16>> ~ <List <Digit 16> ~ Char> ~ EditTree")
+        });
 
     setup_hex_master(&ctx, &rt_int);
 
@@ -267,7 +110,6 @@ async fn main() {
             SingletonBuffer::new(0).get_port()
         ).unwrap().get();
 
-
     let hex_digits_view = rt_int.descend(Context::parse(&ctx, "
               <PosInt 16 LittleEndian>
             ~ <Seq <Digit 16> >
@@ -278,8 +120,7 @@ async fn main() {
         .view_list::<u64>()
         .map(|v| TerminalAtom::from(char::from_digit(*v as u32, 16)))
         .to_sequence()
-        .to_grid_horizontal()
-    ;
+        .to_grid_horizontal();
 
     let dec_digits_view = rt_int.descend(Context::parse(&ctx, "
               <PosInt 10 LittleEndian>
@@ -291,8 +132,7 @@ async fn main() {
         .view_list::<u64>()
         .map(|v| TerminalAtom::from(char::from_digit(*v as u32, 10)))
         .to_sequence()
-        .to_grid_horizontal()
-    ;
+        .to_grid_horizontal();
 
     /* list of both editors
      */

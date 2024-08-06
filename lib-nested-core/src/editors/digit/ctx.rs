@@ -9,28 +9,21 @@ use {
         }
     },
     crate::{
-        repr_tree::{Context, ReprTree, ReprTreeExt, ReprLeaf},
+        repr_tree::{Context, ReprTree, ReprTreeExt, ReprLeaf, GenericReprTreeMorphism},
         editors::digit::DigitEditor,
     },
     std::sync::{Arc, RwLock}
 };
 
 pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
-
     // todo: proper scoping of Radix variable
     ctx.write().unwrap().add_varname("Radix");
 
-    let morphtype =
-            crate::repr_tree::MorphismType {
-                src_type: Context::parse(&ctx, "<Digit Radix>~Char"),
-                dst_type: Context::parse(&ctx, "<Digit Radix>~EditTree")
-            };
+    let digit_morph_char_to_edittree = GenericReprTreeMorphism::new(
+        Context::parse(&ctx, "<Digit Radix>~Char"),
+        Context::parse(&ctx, "<Digit Radix>~EditTree"),
 
-    ctx.write().unwrap()
-        .morphisms
-        .add_morphism(
-            morphtype,
-            {
+        {
                 let ctx = ctx.clone();
                 move |src_rt, σ| {
                     let radix =
@@ -39,32 +32,14 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
                             _ => 0
                         };
 
-                    /* get char representation or create it if not available
-                     */
-                    let char_rt =
-                        if let Some(crt) = src_rt.descend(Context::parse(&ctx, "Char")) {
-                            crt
-                        } else {
-                            /* TODO: replace this with some formal specification
-                             *       of "required representations"
-                             */
-                            let crt = ReprTree::from_singleton_buffer(
-                                Context::parse(&ctx, "Char"),
-                                SingletonBuffer::new('\0')
-                            );
-                            src_rt.insert_branch(crt.clone());
-                            crt
-                        };
-
                     /* Create EditTree object
                      */
                     let mut edittree = DigitEditor::new(
                         ctx.clone(),
                         radix,
-                        src_rt.descend(
-                            Context::parse(&ctx, "Char")
-                        ).unwrap()
-                        .singleton_buffer::<char>()
+                        src_rt
+                            .descend( Context::parse(&ctx, "Char") ).unwrap()
+                            .singleton_buffer::<char>()
                     ).into_node(
                         r3vi::buffer::singleton::SingletonBuffer::<usize>::new(0).get_port()
                     );
@@ -77,22 +52,16 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
                             )
                         );
                 }
-            }
-        );
+        }
+    );
 
-    let morphtype =
-            crate::repr_tree::MorphismType {
-                src_type: Context::parse(&ctx, "<Digit Radix>~Char"),
-                dst_type: Context::parse(&ctx, "<Digit Radix>~ℤ_2^64~machine.UInt64")
-            };
+    let digit_morph_char_to_u64 = GenericReprTreeMorphism::new(
+        Context::parse(&ctx, "<Digit Radix>~Char"),
+        Context::parse(&ctx, "<Digit Radix>~ℤ_2^64~machine.UInt64"),
 
-    ctx.write().unwrap()
-        .morphisms
-        .add_morphism(
-            morphtype,
-            {
-                let ctx = ctx.clone();
-                move |rt: &mut Arc<RwLock<ReprTree>>, σ: &std::collections::HashMap<laddertypes::TypeID, TypeTerm>| {
+        {
+            let ctx = ctx.clone();
+            move |rt: &mut Arc<RwLock<ReprTree>>, σ: &std::collections::HashMap<laddertypes::TypeID, TypeTerm>| {
                     /* infer radix from type
                      */
                     let radix_typeid = ctx.read().unwrap().get_var_typeid("Radix").unwrap();
@@ -123,19 +92,15 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
                     } else {
                         eprintln!("radix too large ({})", radix);
                     }
-                }
             }
-        );
+        }
+    );
 
 
-    let morphtype =
-            crate::repr_tree::MorphismType {
-                src_type: Context::parse(&ctx, "<Digit Radix>~ℤ_2^64~machine.UInt64"),
-                dst_type: Context::parse(&ctx, "<Digit Radix>~Char")
-            };
-
-    ctx.write().unwrap().morphisms
-        .add_morphism(morphtype, {
+    let digit_morph_u64_to_char = GenericReprTreeMorphism::new(
+        Context::parse(&ctx, "<Digit Radix>~ℤ_2^64~machine.UInt64"),
+        Context::parse(&ctx, "<Digit Radix>~Char"),
+        {
             let ctx = ctx.clone();
             move |rt: &mut Arc<RwLock<ReprTree>>, σ: &std::collections::HashMap<laddertypes::TypeID, TypeTerm>| {
                 /* infer radix from type
@@ -163,7 +128,13 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
                     eprintln!("radix too large ({})", radix);
                 }
             }
-        });
+        }
+    );
+
+
+    ctx.write().unwrap().morphisms.add_morphism( digit_morph_char_to_edittree );
+    ctx.write().unwrap().morphisms.add_morphism( digit_morph_char_to_u64 );
+    ctx.write().unwrap().morphisms.add_morphism( digit_morph_u64_to_char );
 }
 
 

@@ -228,10 +228,12 @@ impl PTYListController {
                     rt.read().unwrap().get_type().clone(),
                     ctx.type_term_from_str("EditTree").expect("")
                 ]);
-                ctx.morphisms.apply_morphism(
-                    rt.clone(),
-                    &rt.get_type(),
-                    &ladder 
+                ctx.apply_morphism(
+                    &rt,
+                    &laddertypes::MorphismType {
+                        src_type: rt.get_type(),
+                        dst_type: ladder
+                    }
                 );
 
                 let new_edittree = ctx.setup_edittree(

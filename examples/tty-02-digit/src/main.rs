@@ -69,16 +69,19 @@ async fn main() {
     /* furthermore, setup projections to and from u8 value,
      * this synchronizes the buffers 
      */
-    ctx.read().unwrap().morphisms.apply_morphism(
-        rt_digit.clone(),
-        &Context::parse(&ctx, "<Digit 16>~Char"),
-        &Context::parse(&ctx, "<Digit 16>~ℤ_2^64~machine.UInt64")
+    ctx.read().unwrap().apply_morphism(
+        &rt_digit,
+        &laddertypes::MorphismType {
+            src_type: Context::parse(&ctx, "<Digit 16>~Char"),
+            dst_type: Context::parse(&ctx, "<Digit 16>~ℤ_2^64~machine.UInt64")
+        }
     );
-
-    ctx.read().unwrap().morphisms.apply_morphism(
-        rt_digit.clone(),
-        &Context::parse(&ctx, "<Digit 16>~Char"),
-        &Context::parse(&ctx, "<Digit 16>~EditTree")
+    ctx.read().unwrap().apply_morphism(
+        &rt_digit,
+        &laddertypes::MorphismType {
+            src_type: Context::parse(&ctx, "<Digit 16>~Char"),
+            dst_type: Context::parse(&ctx, "<Digit 16>~EditTree")
+        }
     );
 
     /* setup TTY-Display for DigitEditor

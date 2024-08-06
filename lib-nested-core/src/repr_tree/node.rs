@@ -13,7 +13,7 @@ use {
         },
         buffer::{singleton::*, vec::*}
     },
-    laddertypes::{TypeTerm},
+    laddertypes::{TypeTerm, TypeID},
     std::{
         collections::HashMap,
         sync::{Arc, RwLock},
@@ -199,10 +199,21 @@ impl ReprTree {
 
                 leaf.attach_to(src_port);
                 self.leaf = Some(leaf);
+            }           
+            else if self.type_tag == TypeTerm::App(vec![
+                TypeTerm::TypeID(TypeID::Fun(11)),
+                TypeTerm::TypeID(TypeID::Fun(1))
+            ]) {
+                let mut leaf = ReprLeaf::from_vec_buffer(
+                    VecBuffer::<char>::new()
+                );
+
+                leaf.attach_to(src_port);
+                self.leaf = Some(leaf);
             } else {
                 self.leaf = Some(ReprLeaf::from_view(src_port));
             }
-        }
+         }
     }
 
     pub fn detach(&mut self, ctx: &Arc<RwLock<Context>>) {

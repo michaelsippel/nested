@@ -45,21 +45,16 @@ async fn main() {
      */
     let mut rt_string = ReprTree::new_arc( Context::parse(&ctx, "<List Char>") );
 
-    let vec = VecBuffer::<Arc<RwLock<EditTree>>>::new();
     rt_string.insert_leaf(
-        Context::parse(&ctx, "<List EditTree> ~ <Vec EditTree>"),
-        nested::repr_tree::ReprLeaf::from_vec_buffer( vec.clone() )
+        Context::parse(&ctx, "<List~Vec EditTree>"),
+        nested::repr_tree::ReprLeaf::from_vec_buffer( VecBuffer::<Arc<RwLock<EditTree>>>::new() )
     );
-
-    let v2 = VecBuffer::<char>::new();
-    rt_string.insert_leaf(
-        Context::parse(&ctx, "<Vec Char>"),
-        nested::repr_tree::ReprLeaf::from_vec_buffer( v2.clone() )
-    );
-    ctx.read().unwrap().morphisms.apply_morphism(
-        rt_string.clone(),
-        &Context::parse(&ctx, "<List Char~EditTree> ~ <Vec EditTree>"),
-        &Context::parse(&ctx, "<List Char> ~ EditTree")
+    ctx.read().unwrap().apply_morphism(
+        &rt_string,
+        &laddertypes::MorphismType {
+            src_type: Context::parse(&ctx, "<List Char~EditTree>~<Vec EditTree>"),
+            dst_type: Context::parse(&ctx, "<List Char> ~ EditTree")
+        }
     );
 
     /* Setup the Editor-View for this ReprTree
@@ -74,10 +69,12 @@ async fn main() {
      * we apply a morphism that, given the List of Edit-Trees, extracts
      * the value from each EditTree and shows them in a ListView.
      */
-    ctx.read().unwrap().morphisms.apply_morphism(
-        rt_string.clone(),
-        &Context::parse(&ctx, "<List Char>~EditTree"),
-        &Context::parse(&ctx, "<List Char>")
+    ctx.read().unwrap().apply_morphism(
+        &rt_string,
+        &laddertypes::MorphismType {
+            src_type: Context::parse(&ctx, "<List Char>~EditTree"),
+            dst_type: Context::parse(&ctx, "<List Char>")
+        }
     );
 
     /* Now, get the ListView that serves our char-values.
@@ -91,10 +88,12 @@ async fn main() {
     /* Lets add another morphism which will store the values
      * of the character-list in a `Vec<char>`
      */
-    ctx.read().unwrap().morphisms.apply_morphism(
-        rt_string.clone(),
-        &Context::parse(&ctx, "<List Char>"),
-        &Context::parse(&ctx, "<List Char>~<Vec Char>")
+    ctx.read().unwrap().apply_morphism(
+        &rt_string,
+        &laddertypes::MorphismType {
+            src_type: Context::parse(&ctx, "<List Char>"),
+            dst_type: Context::parse(&ctx, "<List Char>~<Vec Char>")
+        }
     );
 
     /* Access the Vec<char> object (wrapped behind a VecBuffer<char>)

@@ -9,7 +9,7 @@ use {
     },
     laddertypes::{TypeTerm},
     crate::{
-        repr_tree::{Context, ReprTree, ReprLeaf, ReprTreeExt},
+        repr_tree::{Context, ReprTree, ReprLeaf, ReprTreeExt, GenericReprTreeMorphism},
         edit_tree::{EditTree, TreeNavResult},
         editors::ObjCommander,
     },
@@ -18,21 +18,16 @@ use {
 };
 
 pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
-    let morphtype =
-            crate::repr_tree::MorphismType {
-                src_type: Context::parse(&ctx, "Char"),
-                dst_type: Context::parse(&ctx, "Char~EditTree")
-            };
 
-    ctx.write().unwrap()
-        .morphisms
-        .add_morphism(
-            morphtype,
-            {
-                let ctx = ctx.clone();
-                move |rt, σ| {
-                    {
-                        let mut b = rt.write().unwrap().singleton_buffer::<char>();
+    let char_morph_to_edittree = GenericReprTreeMorphism::new(
+        Context::parse(&ctx, "Char"),
+        Context::parse(&ctx, "Char~EditTree"),
+        {
+            let ctx = ctx.clone();
+            move |rt, σ| {
+                
+                {
+                    let mut b = rt.write().unwrap().singleton_buffer::<char>();
                         if let Some(buf) = b {
                             // buffer already exists
                         } else {
@@ -56,7 +51,11 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
 
                     rt.insert_leaf(
                         Context::parse(&ctx, "EditTree"),
-                        ReprLeaf::from_singleton_buffer(SingletonBuffer::new(Arc::new(RwLock::new(edittree))))
+                        ReprLeaf::from_singleton_buffer(
+                            SingletonBuffer::new(
+                                Arc::new(RwLock::new(edittree))
+                            )
+                        )
                     );
 
                     ctx.read().unwrap().setup_edittree(
@@ -64,8 +63,11 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
                         SingletonBuffer::new(0).get_port()
                     );
                 }
-            }
-        );
+            
+        }
+    );
+
+    ctx.write().unwrap().morphisms.add_morphism( char_morph_to_edittree );
 }
 
 pub struct CharEditor {
